@@ -516,6 +516,9 @@ function openRewardModal(card) {
 
 function closeRewardModal() {
   rewardModalEl.classList.add("hidden");
+  rewardCardEl.className = "modal-card reward-card";
+  rewardPreviewEl.className = "card-detail-preview";
+  rewardSparklesEl.classList.add("hidden");
 }
 
 function renderCardBox() {
@@ -618,6 +621,7 @@ function clearAdvanceTimer() {
 function showStepsScreen() {
   clearAdvanceTimer();
   stopRecognition();
+  closeRewardModal();
   currentMode = "steps";
   currentStep = null;
   currentPhraseIndex = 0;

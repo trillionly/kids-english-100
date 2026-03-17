@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -8,21 +7,32 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-
   <div class="app">
-    <h1>📘 Kids English 100</h1>
+    <header class="topbar">
+      <h1>🚀 Kids English 100</h1>
+      <p class="subtitle">초등 저학년용 일상 영어 회화</p>
+    </header>
 
-    <div class="card" id="card">
-      <p id="english">I'm hungry.</p>
-      <p id="korean">배고파요.</p>
-    </div>
+    <main class="card-wrap">
+      <div class="card">
+        <div class="badge">
+          <span id="phrase-number">1 / 100</span>
+          <span id="phrase-category">play</span>
+        </div>
 
-    <div class="buttons">
-      <button onclick="speak()">🔊 듣기</button>
-      <button onclick="nextCard()">➡️ 다음</button>
-    </div>
+        <p id="english" class="english">It's my turn now.</p>
+
+        <p id="korean" class="korean hidden">이제 내 차례야.</p>
+
+        <div class="button-group">
+          <button id="speak-btn" class="btn primary">🔊 듣기</button>
+          <button id="meaning-btn" class="btn secondary">👀 뜻 보기</button>
+          <button id="next-btn" class="btn accent">➡️ 다음</button>
+        </div>
+      </div>
+    </main>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

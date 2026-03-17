@@ -61,6 +61,13 @@ const cardDetailPreviewEl = document.getElementById("card-detail-preview");
 const cardDetailTitleEl = document.getElementById("card-detail-title");
 const cardDetailTypeEl = document.getElementById("card-detail-type");
 const cardDetailCloseBtn = document.getElementById("card-detail-close-btn");
+const rewardModalEl = document.getElementById("reward-modal");
+const rewardCardEl = document.getElementById("reward-card");
+const rewardPreviewEl = document.getElementById("reward-preview");
+const rewardCardIdEl = document.getElementById("reward-card-id");
+const rewardCardTypeEl = document.getElementById("reward-card-type");
+const rewardSparklesEl = document.getElementById("reward-sparkles");
+const rewardCloseBtn = document.getElementById("reward-close-btn");
 
 let currentStep = null;
 let currentPhraseIndex = 0;
@@ -74,6 +81,7 @@ let pendingStep = null;
 let reviewQueue = [];
 let currentReviewIndex = 0;
 let reviewProgress = [];
+let audioContext = null;
 
 const state = loadState();
 
@@ -372,33 +380,32 @@ function getRewardCard(type, stepNumber) {
 
 function addCard(card) {
   if (state.collectedCards.some((item) => item.id === card.id && item.type === card.type)) {
-    return;
+    return null;
   }
 
   state.collectedCards.push(card);
+  return card;
 }
 
 function giveStepRewards(stepNumber) {
   if (stepNumber % 10 === 0) {
-    addCard(getRewardCard("super", stepNumber));
-    return;
+    return addCard(getRewardCard("super", stepNumber));
   }
 
   if (stepNumber % 3 === 0) {
-    addCard(getRewardCard("special", stepNumber));
-    return;
+    return addCard(getRewardCard("special", stepNumber));
   }
 
-  addCard(getRewardCard("normal", stepNumber));
+  return addCard(getRewardCard("normal", stepNumber));
 }
 
 function awardCardForCompletedStep(stepNumber) {
   if (state.completedSteps.includes(stepNumber)) {
-    return;
+    return null;
   }
 
   state.completedSteps.push(stepNumber);
-  giveStepRewards(stepNumber);
+  return giveStepRewards(stepNumber);
 }
 
 function getAllCardSlots() {
@@ -432,6 +439,83 @@ function openCardDetail(card) {
 
 function closeCardDetail() {
   cardDetailModalEl.classList.add("hidden");
+}
+
+function getAudioContext() {
+  if (!audioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return null;
+    }
+    audioContext = new AudioContextClass();
+  }
+  return audioContext;
+}
+
+function playTone(startTime, frequency, duration, volume, type) {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  gainNode.gain.setValueAtTime(0.0001, startTime);
+  gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.02);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(context.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration);
+}
+
+function playRewardSound(cardType) {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  if (context.state === "suspended") {
+    context.resume().catch(() => {});
+  }
+
+  const start = context.currentTime + 0.01;
+
+  if (cardType === "super") {
+    playTone(start, 392, 0.22, 0.16, "triangle");
+    playTone(start + 0.12, 523.25, 0.28, 0.18, "triangle");
+    playTone(start + 0.26, 783.99, 0.45, 0.2, "sine");
+    return;
+  }
+
+  if (cardType === "special") {
+    playTone(start, 659.25, 0.18, 0.1, "sine");
+    playTone(start + 0.1, 783.99, 0.24, 0.12, "triangle");
+    playTone(start + 0.2, 987.77, 0.28, 0.1, "sine");
+    return;
+  }
+
+  playTone(start, 523.25, 0.12, 0.08, "sine");
+  playTone(start + 0.07, 659.25, 0.14, 0.06, "triangle");
+}
+
+function openRewardModal(card) {
+  rewardCardEl.className = `modal-card reward-card ${card.type}`;
+  rewardPreviewEl.className = `card-detail-preview ${card.type}`;
+  rewardPreviewEl.textContent = card.type.toUpperCase();
+  rewardCardIdEl.textContent = card.id;
+  rewardCardTypeEl.textContent = `Type: ${card.type}`;
+  rewardSparklesEl.classList.toggle("hidden", card.type === "normal");
+  rewardModalEl.classList.remove("hidden");
+  playRewardSound(card.type);
+}
+
+function closeRewardModal() {
+  rewardModalEl.classList.add("hidden");
 }
 
 function renderCardBox() {
@@ -748,7 +832,7 @@ function toggleMeaning() {
 }
 
 function completeStep(stepNumber) {
-  awardCardForCompletedStep(stepNumber);
+  const awardedCard = awardCardForCompletedStep(stepNumber);
 
   const nextStep = stepNumber + 1;
   const today = new Date().toISOString().slice(0, 10);
@@ -761,6 +845,8 @@ function completeStep(stepNumber) {
     state.unlockedSteps.push(nextStep);
     state.lastUnlockDate = today;
   }
+
+  return awardedCard;
 }
 
 function moveToNextPhraseOrFinishStep() {
@@ -777,7 +863,7 @@ function moveToNextPhraseOrFinishStep() {
       !state.unlockedSteps.includes(nextStep) &&
       state.lastUnlockDate !== today;
 
-    completeStep(currentStep);
+    const awardedCard = completeStep(currentStep);
     saveState();
     renderSteps();
     renderCardBox();
@@ -789,6 +875,10 @@ function moveToNextPhraseOrFinishStep() {
     }
 
     showStepsScreen();
+
+    if (awardedCard) {
+      openRewardModal(awardedCard);
+    }
     return;
   }
 
@@ -924,6 +1014,12 @@ cardDetailCloseBtn.addEventListener("click", closeCardDetail);
 cardDetailModalEl.addEventListener("click", (event) => {
   if (event.target === cardDetailModalEl || event.target.classList.contains("modal-backdrop")) {
     closeCardDetail();
+  }
+});
+rewardCloseBtn.addEventListener("click", closeRewardModal);
+rewardModalEl.addEventListener("click", (event) => {
+  if (event.target === rewardModalEl || event.target.classList.contains("modal-backdrop")) {
+    closeRewardModal();
   }
 });
 

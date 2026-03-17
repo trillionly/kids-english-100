@@ -2,7 +2,7 @@ import { phrases } from "./data/phrases.js";
 
 const PHRASES_PER_STEP = 3;
 const PHRASE_TARGET = 5;
-const REVIEW_TARGET = 1;
+const REVIEW_TARGET = 3;
 const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
 
@@ -17,7 +17,8 @@ const STORAGE_KEYS = {
   completedSteps: "kids-english-steps-completed",
   phraseProgress: "kids-english-steps-phrase-progress",
   lastUnlockDate: "kids-english-steps-last-unlock-date",
-  cards: "kids-english-cards"
+  cards: "kids-english-cards",
+  testMode: "kids-english-test-mode"
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -28,6 +29,7 @@ const reviewScreenEl = document.getElementById("review-screen");
 const learningScreenEl = document.getElementById("learning-screen");
 const stepsGridEl = document.getElementById("steps-grid");
 const stepsMessageEl = document.getElementById("steps-message");
+const testModeBannerEl = document.getElementById("test-mode-banner");
 const cardSectionsEl = document.getElementById("card-sections");
 
 const reviewStepLabelEl = document.getElementById("review-step-label");
@@ -48,6 +50,7 @@ const cardBoxBtn = document.getElementById("card-box-btn");
 const cardBoxBackBtn = document.getElementById("card-box-back-btn");
 const reviewBackBtn = document.getElementById("review-back-btn");
 const backBtn = document.getElementById("back-btn");
+const testModeBtn = document.getElementById("test-mode-btn");
 const resetBtn = document.getElementById("reset-btn");
 const reviewListenBtn = document.getElementById("review-listen-btn");
 const reviewRecordBtn = document.getElementById("review-record-btn");
@@ -133,7 +136,8 @@ function createInitialState() {
     completedSteps: [],
     phraseProgress: {},
     lastUnlockDate: "",
-    collectedCards: []
+    collectedCards: [],
+    testMode: false
   };
 }
 
@@ -164,6 +168,7 @@ function loadState() {
     .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS);
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
   nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
+  nextState.testMode = window.localStorage.getItem(STORAGE_KEYS.testMode) === "true";
   const storedCards = readStoredObject(STORAGE_KEYS.cards);
   nextState.collectedCards = Array.isArray(storedCards.collectedCards)
     ? storedCards.collectedCards
@@ -196,6 +201,7 @@ function saveState() {
     JSON.stringify(state.phraseProgress)
   );
   window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
+  window.localStorage.setItem(STORAGE_KEYS.testMode, String(state.testMode));
   window.localStorage.setItem(
     STORAGE_KEYS.cards,
     JSON.stringify({ collectedCards: state.collectedCards })
@@ -217,7 +223,7 @@ function setPhraseProgress(phraseId, value) {
 }
 
 function isStepUnlocked(stepNumber) {
-  return state.unlockedSteps.includes(stepNumber);
+  return state.testMode || state.unlockedSteps.includes(stepNumber);
 }
 
 function isStepCompleted(stepNumber) {
@@ -618,18 +624,19 @@ function renderCardBox() {
       .filter((card) => card.type === type)
       .forEach((card) => {
         const button = document.createElement("button");
+        const isVisible = state.testMode || card.collected;
         button.type = "button";
-        button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
+        button.className = `${getCardClass(card.type)}${isVisible ? "" : " locked"}`;
         button.innerHTML = `
           <span class="card-tile-image">${
-            card.collected
+            isVisible
               ? `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`
               : "?"
           }</span>
-          <span class="card-tile-label">${card.collected ? card.id : "Locked"}</span>
+          <span class="card-tile-label">${isVisible ? card.id : "Locked"}</span>
         `;
         button.addEventListener("click", () => {
-          openCardDetail(card);
+          openCardDetail({ ...card, collected: isVisible });
         });
         grid.appendChild(button);
       });
@@ -670,10 +677,13 @@ function renderReviewSlots() {
   const progress = reviewProgress[currentReviewIndex] || 0;
   reviewSlotsEl.innerHTML = "";
 
-  const slot = document.createElement("span");
-  slot.className = `success-slot${progress >= REVIEW_TARGET ? " filled" : ""}`;
-  slot.textContent = progress >= REVIEW_TARGET ? "V" : "1";
-  reviewSlotsEl.appendChild(slot);
+  for (let index = 0; index < REVIEW_TARGET; index += 1) {
+    const slot = document.createElement("span");
+    const isComplete = index < progress;
+    slot.className = `success-slot${isComplete ? " filled" : ""}`;
+    slot.textContent = isComplete ? "V" : String(index + 1);
+    reviewSlotsEl.appendChild(slot);
+  }
 }
 
 function setFeedback(message, tone) {
@@ -689,6 +699,12 @@ function setReviewFeedback(message, tone) {
 function setStepsMessage(message) {
   stepsMessageEl.textContent = message;
   stepsMessageEl.classList.toggle("hidden", !message);
+}
+
+function updateTestModeUI() {
+  testModeBannerEl.classList.toggle("hidden", !state.testMode);
+  testModeBtn.classList.toggle("active", state.testMode);
+  testModeBtn.textContent = state.testMode ? "Test On" : "Test";
 }
 
 function updateRecordButtons() {
@@ -784,6 +800,18 @@ function getReviewTargets(stepNumber) {
     .filter(Boolean);
 }
 
+function getStepRewardType(stepNumber) {
+  if (stepNumber % 10 === 0) {
+    return "super";
+  }
+
+  if (stepNumber % 3 === 0) {
+    return "special";
+  }
+
+  return "normal";
+}
+
 function startSelectedStep(step) {
   clearAdvanceTimer();
   currentStep = step;
@@ -814,15 +842,17 @@ function beginStep(step) {
 
 function renderSteps() {
   stepsGridEl.innerHTML = "";
+  updateTestModeUI();
 
   for (let step = 1; step <= TOTAL_STEPS; step += 1) {
     const button = document.createElement("button");
     const hasEnoughPhrases = getStepPhrases(step).length === PHRASES_PER_STEP;
     const unlocked = isStepUnlocked(step) && hasEnoughPhrases;
     const completed = isStepCompleted(step);
+    const rewardType = getStepRewardType(step);
 
     button.type = "button";
-    button.className = `step-btn${completed ? " completed" : ""}`;
+    button.className = `step-btn reward-${rewardType}${completed ? " completed" : ""}`;
     button.disabled = !unlocked;
     button.innerHTML = `
       <span class="step-btn-label">Step ${step}</span>
@@ -864,7 +894,7 @@ function renderReviewCard() {
   reviewEnglishEl.textContent = item.phrase.en;
   reviewKoreanEl.textContent = item.phrase.ko;
   renderReviewSlots();
-  setReviewFeedback("Press the mic and say the sentence once.", "");
+  setReviewFeedback("Press the mic and say the sentence three times.", "");
   reviewRecordBtn.classList.remove("hidden");
   reviewListenBtn.classList.remove("hidden");
   reviewStartBtn.classList.add("hidden");
@@ -998,13 +1028,21 @@ function advanceReview() {
 
 function handleSpeechSuccess() {
   if (currentMode === "review") {
-    reviewProgress[currentReviewIndex] = REVIEW_TARGET;
+    reviewProgress[currentReviewIndex] = Math.min(
+      REVIEW_TARGET,
+      (reviewProgress[currentReviewIndex] || 0) + 1
+    );
     renderReviewSlots();
-    setReviewFeedback("Nice review! Let's go on.", "success");
-    clearAdvanceTimer();
-    advanceTimerId = window.setTimeout(() => {
-      advanceReview();
-    }, AUTO_ADVANCE_DELAY);
+
+    if (reviewProgress[currentReviewIndex] >= REVIEW_TARGET) {
+      setReviewFeedback("Nice review! Let's go on.", "success");
+      clearAdvanceTimer();
+      advanceTimerId = window.setTimeout(() => {
+        advanceReview();
+      }, AUTO_ADVANCE_DELAY);
+    } else {
+      setReviewFeedback("Good job! Say it again.", "success");
+    }
     return;
   }
 
@@ -1090,6 +1128,25 @@ function resetProgress() {
   window.location.reload();
 }
 
+function enableTestMode() {
+  const password = window.prompt("Enter test mode password:");
+
+  if (password === null) {
+    return;
+  }
+
+  if (password !== "0628") {
+    window.alert("Wrong password.");
+    return;
+  }
+
+  state.testMode = true;
+  saveState();
+  renderSteps();
+  renderCardBox();
+  setStepsMessage("Test mode is active.");
+}
+
 cardBoxBtn.addEventListener("click", () => {
   showCardBoxScreen();
 });
@@ -1104,6 +1161,7 @@ backBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
 });
+testModeBtn.addEventListener("click", enableTestMode);
 resetBtn.addEventListener("click", resetProgress);
 reviewListenBtn.addEventListener("click", speakCurrentReviewPhrase);
 reviewRecordBtn.addEventListener("click", startRecognition);

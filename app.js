@@ -13,20 +13,15 @@ const meaningBtn = document.getElementById("meaning-btn");
 const nextBtn = document.getElementById("next-btn");
 
 function formatCategory(category) {
-  const labels = {
-    play: "놀이",
-    emotion: "감정",
-    friends: "친구",
-    hero: "히어로",
-    daily: "일상",
-    action: "행동",
-    movement: "움직임",
-    interaction: "상호작용",
-    game: "게임",
-    "daily-action": "생활"
-  };
+  return category
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
-  return labels[category] || category;
+function updateMeaningVisibility() {
+  koreanEl.classList.toggle("hidden", !meaningVisible);
+  meaningBtn.textContent = meaningVisible ? "Hide Meaning" : "Show Meaning";
 }
 
 function renderCard() {
@@ -38,8 +33,7 @@ function renderCard() {
   phraseCategoryEl.textContent = formatCategory(phrase.category);
 
   meaningVisible = false;
-  koreanEl.classList.add("hidden");
-  meaningBtn.textContent = "👀 뜻 보기";
+  updateMeaningVisibility();
 }
 
 function speakCurrentPhrase() {
@@ -48,7 +42,7 @@ function speakCurrentPhrase() {
 
   utterance.lang = "en-US";
   utterance.rate = 0.95;
-  utterance.pitch = 1.0;
+  utterance.pitch = 1;
 
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
@@ -56,14 +50,7 @@ function speakCurrentPhrase() {
 
 function toggleMeaning() {
   meaningVisible = !meaningVisible;
-
-  if (meaningVisible) {
-    koreanEl.classList.remove("hidden");
-    meaningBtn.textContent = "🙈 뜻 숨기기";
-  } else {
-    koreanEl.classList.add("hidden");
-    meaningBtn.textContent = "👀 뜻 보기";
-  }
+  updateMeaningVisibility();
 }
 
 function nextCard() {

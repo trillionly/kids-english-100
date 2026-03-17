@@ -20,6 +20,7 @@ body {
 .topbar {
   text-align: center;
   margin-bottom: 24px;
+  position: relative;
 }
 
 .topbar h1 {
@@ -33,6 +34,20 @@ body {
   color: #355070;
   font-size: 17px;
   font-weight: 700;
+}
+
+.reset-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #355070;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .steps-header {
@@ -57,6 +72,15 @@ body {
   gap: 14px;
   max-width: 860px;
   margin: 0 auto;
+}
+
+.steps-message {
+  max-width: 860px;
+  margin: 0 auto 14px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #d94d4d;
 }
 
 .step-btn {

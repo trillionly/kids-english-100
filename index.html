@@ -11,6 +11,7 @@
     <header class="topbar">
       <h1>Kids English Steps</h1>
       <p class="subtitle">Speak the sentence and clear each step</p>
+      <button id="reset-btn" class="reset-btn" type="button">Reset</button>
     </header>
 
     <main>
@@ -19,6 +20,7 @@
           <h2>Choose a Step</h2>
           <p>Each step has 3 phrases. Say each phrase correctly 5 times.</p>
         </div>
+        <p id="steps-message" class="steps-message hidden"></p>
         <div id="steps-grid" class="steps-grid"></div>
       </section>
 
@@ -42,8 +44,8 @@
             <p id="feedback-text" class="feedback-text">Press the mic and try speaking.</p>
 
             <div class="button-group">
-              <button id="speak-btn" class="btn primary" type="button">Listen</button>
-              <button id="record-btn" class="btn mic-btn" type="button">Start Mic</button>
+              <button id="speak-btn" class="btn primary" type="button">👂 Listen</button>
+              <button id="record-btn" class="btn mic-btn" type="button">🎤 Start Mic</button>
               <button id="meaning-btn" class="btn secondary" type="button" disabled>Show Meaning</button>
             </div>
           </div>

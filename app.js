@@ -8,7 +8,8 @@ const AUTO_ADVANCE_DELAY = 1200;
 const STORAGE_KEYS = {
   unlockedSteps: "kids-english-steps-unlocked",
   completedSteps: "kids-english-steps-completed",
-  phraseProgress: "kids-english-steps-phrase-progress"
+  phraseProgress: "kids-english-steps-phrase-progress",
+  lastUnlockDate: "kids-english-steps-last-unlock-date"
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -16,6 +17,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 const stepsScreenEl = document.getElementById("steps-screen");
 const learningScreenEl = document.getElementById("learning-screen");
 const stepsGridEl = document.getElementById("steps-grid");
+const stepsMessageEl = document.getElementById("steps-message");
 
 const stepLabelEl = document.getElementById("step-label");
 const phraseStatusEl = document.getElementById("phrase-status");
@@ -25,6 +27,7 @@ const successSlotsEl = document.getElementById("success-slots");
 const feedbackTextEl = document.getElementById("feedback-text");
 
 const backBtn = document.getElementById("back-btn");
+const resetBtn = document.getElementById("reset-btn");
 const speakBtn = document.getElementById("speak-btn");
 const recordBtn = document.getElementById("record-btn");
 const meaningBtn = document.getElementById("meaning-btn");
@@ -71,7 +74,8 @@ function createInitialState() {
   return {
     unlockedSteps: [1],
     completedSteps: [],
-    phraseProgress: {}
+    phraseProgress: {},
+    lastUnlockDate: ""
   };
 }
 
@@ -101,6 +105,7 @@ function loadState() {
   nextState.completedSteps = readStoredArray(STORAGE_KEYS.completedSteps)
     .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS);
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
+  nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
 
   if (!nextState.unlockedSteps.includes(1)) {
     nextState.unlockedSteps.unshift(1);
@@ -122,6 +127,7 @@ function saveState() {
     STORAGE_KEYS.phraseProgress,
     JSON.stringify(state.phraseProgress)
   );
+  window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
 }
 
 function getStepPhrases(stepNumber) {
@@ -336,15 +342,20 @@ function setFeedback(message, tone) {
   feedbackTextEl.className = `feedback-text${tone ? ` ${tone}` : ""}`;
 }
 
+function setStepsMessage(message) {
+  stepsMessageEl.textContent = message;
+  stepsMessageEl.classList.toggle("hidden", !message);
+}
+
 function updateRecordButton() {
   if (!SpeechRecognition) {
     recordBtn.disabled = true;
-    recordBtn.textContent = "Mic Unavailable";
+    recordBtn.textContent = "🎤 Mic Unavailable";
     return;
   }
 
   recordBtn.disabled = false;
-  recordBtn.textContent = isListening ? "Listening..." : "Start Mic";
+  recordBtn.textContent = isListening ? "🎤 Listening..." : "🎤 Start Mic";
 }
 
 function stopRecognition() {
@@ -371,6 +382,7 @@ function showStepsScreen() {
 }
 
 function showLearningScreen() {
+  setStepsMessage("");
   stepsScreenEl.classList.add("hidden");
   learningScreenEl.classList.remove("hidden");
 }
@@ -486,8 +498,15 @@ function completeStep(stepNumber) {
   }
 
   const nextStep = stepNumber + 1;
-  if (nextStep <= TOTAL_STEPS && !state.unlockedSteps.includes(nextStep)) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (
+    nextStep <= TOTAL_STEPS &&
+    !state.unlockedSteps.includes(nextStep) &&
+    state.lastUnlockDate !== today
+  ) {
     state.unlockedSteps.push(nextStep);
+    state.lastUnlockDate = today;
   }
 }
 
@@ -498,9 +517,23 @@ function moveToNextPhraseOrFinishStep() {
   );
 
   if (nextPhraseIndex === -1) {
+    const nextStep = currentStep + 1;
+    const today = new Date().toISOString().slice(0, 10);
+    const canUnlockNextStep =
+      nextStep <= TOTAL_STEPS &&
+      !state.unlockedSteps.includes(nextStep) &&
+      state.lastUnlockDate !== today;
+
     completeStep(currentStep);
     saveState();
     renderSteps();
+
+    if (nextStep <= TOTAL_STEPS && !canUnlockNextStep) {
+      setStepsMessage("Step clear! Come back tomorrow for a new step.");
+    } else {
+      setStepsMessage("");
+    }
+
     showStepsScreen();
     return;
   }
@@ -565,10 +598,30 @@ function startRecognition() {
   }
 }
 
+function resetProgress() {
+  const password = window.prompt("Enter reset password:");
+
+  if (password === null) {
+    return;
+  }
+
+  if (password !== "0523") {
+    window.alert("Wrong password.");
+    return;
+  }
+
+  window.localStorage.removeItem(STORAGE_KEYS.unlockedSteps);
+  window.localStorage.removeItem(STORAGE_KEYS.completedSteps);
+  window.localStorage.removeItem(STORAGE_KEYS.phraseProgress);
+  window.localStorage.removeItem(STORAGE_KEYS.lastUnlockDate);
+  window.location.reload();
+}
+
 backBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
 });
+resetBtn.addEventListener("click", resetProgress);
 speakBtn.addEventListener("click", speakCurrentPhrase);
 recordBtn.addEventListener("click", startRecognition);
 meaningBtn.addEventListener("click", toggleMeaning);

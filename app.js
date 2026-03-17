@@ -502,17 +502,23 @@ function getCardSectionTitle(type) {
 }
 
 function openCardDetail(card) {
+  cardDetailModalEl.classList.remove("opening");
+  void cardDetailModalEl.offsetWidth;
+  cardDetailModalEl.classList.add("opening");
   cardDetailPreviewEl.className = `card-detail-preview ${card.collected ? card.type : "locked"}`;
   cardDetailPreviewEl.innerHTML = card.collected
     ? `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`
     : "?";
-  cardDetailTitleEl.textContent = card.collected ? card.id : "Locked Card";
-  cardDetailTypeEl.textContent = card.collected ? `Type: ${card.type}` : "Type: locked";
+  cardDetailTitleEl.textContent = "";
+  cardDetailTypeEl.textContent = "";
   cardDetailModalEl.classList.remove("hidden");
+  cardDetailModalEl.hidden = false;
 }
 
 function closeCardDetail() {
   cardDetailModalEl.classList.add("hidden");
+  cardDetailModalEl.hidden = true;
+  cardDetailModalEl.classList.remove("opening");
   cardDetailPreviewEl.innerHTML = "";
 }
 
@@ -661,7 +667,7 @@ function renderCardBox() {
     const title = document.createElement("h3");
     const grid = document.createElement("div");
 
-    section.className = "card-section";
+    section.className = `card-section ${type}`;
     title.className = "card-section-title";
     title.textContent = getCardSectionTitle(type);
     grid.className = `card-grid ${type}-grid`;

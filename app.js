@@ -513,6 +513,10 @@ function openCardDetail(card) {
   cardDetailTypeEl.textContent = "";
   cardDetailModalEl.classList.remove("hidden");
   cardDetailModalEl.hidden = false;
+
+  if (card.collected && card.type === "super") {
+    playRewardSound("super");
+  }
 }
 
 function closeCardDetail() {
@@ -684,7 +688,6 @@ function renderCardBox() {
               ? `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`
               : "?"
           }</span>
-          <span class="card-tile-label">${isVisible ? card.id : "Locked"}</span>
         `;
         button.addEventListener("click", () => {
           openCardDetail({ ...card, collected: isVisible });

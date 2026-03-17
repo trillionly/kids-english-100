@@ -1,47 +1,128 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  background: #f4f8ff;
-  text-align: center;
   margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef7ff 100%);
+  color: #222;
 }
 
 .app {
-  padding: 20px;
+  min-height: 100vh;
+  padding: 24px 16px 40px;
 }
 
-h1 {
-  color: #333;
+.topbar {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.subtitle {
+  margin-top: 8px;
+  color: #666;
+  font-size: 16px;
+}
+
+.card-wrap {
+  display: flex;
+  justify-content: center;
 }
 
 .card {
-  background: white;
-  border-radius: 20px;
-  padding: 30px;
-  margin: 20px auto;
-  width: 80%;
-  max-width: 300px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 20px 28px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
-#english {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-#korean {
-  font-size: 18px;
+.badge {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
   color: #666;
 }
 
-button {
-  padding: 15px 20px;
-  margin: 10px;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  cursor: pointer;
+.english {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 20px 0 16px;
+  text-align: center;
+  color: #111;
 }
 
-button:hover {
-  opacity: 0.8;
+.korean {
+  font-size: 22px;
+  line-height: 1.5;
+  margin: 0 0 24px;
+  text-align: center;
+  color: #444;
+}
+
+.hidden {
+  display: none;
+}
+
+.button-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.btn {
+  border: none;
+  border-radius: 16px;
+  padding: 16px 18px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, opacity 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.primary {
+  background: #4f8cff;
+  color: white;
+}
+
+.secondary {
+  background: #ffe58f;
+  color: #333;
+}
+
+.accent {
+  background: #7ee081;
+  color: #173b19;
+}
+
+@media (min-width: 768px) {
+  .topbar h1 {
+    font-size: 38px;
+  }
+
+  .english {
+    font-size: 42px;
+  }
+
+  .korean {
+    font-size: 24px;
+  }
+
+  .button-group {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }

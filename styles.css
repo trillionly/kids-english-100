@@ -208,23 +208,79 @@ body.reward-shake {
 }
 
 .step-btn.reward-special {
-  border-color: rgba(255, 214, 90, 0.44);
-  box-shadow: 0 0 18px rgba(255, 213, 79, 0.12), 0 12px 22px rgba(2, 8, 20, 0.42);
+  position: relative;
+  border-width: 3px;
+  border-color: rgba(110, 173, 255, 0.72);
+  background: linear-gradient(135deg, rgba(22, 211, 255, 0.22) 0%, rgba(49, 116, 255, 0.26) 52%, rgba(116, 72, 255, 0.24) 100%),
+    linear-gradient(180deg, rgba(24, 39, 72, 0.98) 0%, rgba(14, 22, 48, 0.98) 100%);
+  box-shadow:
+    0 0 22px rgba(78, 162, 255, 0.2),
+    0 0 0 1px rgba(146, 224, 255, 0.08),
+    0 12px 22px rgba(2, 8, 20, 0.42);
+  overflow: hidden;
 }
 
 .step-btn.reward-special:hover {
-  border-color: rgba(255, 222, 117, 0.76);
-  box-shadow: 0 0 20px rgba(255, 213, 79, 0.2), 0 12px 22px rgba(2, 8, 20, 0.42);
+  transform: translateY(-2px) scale(1.02);
+  border-color: rgba(126, 224, 255, 0.9);
+  box-shadow:
+    0 0 28px rgba(74, 187, 255, 0.3),
+    0 0 0 1px rgba(146, 224, 255, 0.12),
+    0 12px 22px rgba(2, 8, 20, 0.42);
 }
 
 .step-btn.reward-super {
-  border-color: rgba(167, 108, 255, 0.62);
-  box-shadow: 0 0 22px rgba(122, 77, 255, 0.18), 0 12px 22px rgba(2, 8, 20, 0.42);
+  position: relative;
+  border-width: 3px;
+  border-color: rgba(255, 211, 101, 0.92);
+  background: linear-gradient(135deg, rgba(255, 240, 151, 0.32) 0%, rgba(255, 169, 57, 0.28) 48%, rgba(255, 95, 31, 0.24) 100%),
+    linear-gradient(180deg, rgba(43, 24, 12, 0.98) 0%, rgba(24, 12, 8, 0.98) 100%);
+  box-shadow:
+    0 0 28px rgba(255, 180, 67, 0.34),
+    0 0 0 1px rgba(255, 230, 164, 0.14),
+    0 14px 24px rgba(2, 8, 20, 0.48);
+  animation: super-step-pulse 2.2s ease-in-out infinite;
+  overflow: hidden;
 }
 
 .step-btn.reward-super:hover {
-  border-color: rgba(186, 136, 255, 0.86);
-  box-shadow: 0 0 24px rgba(122, 77, 255, 0.28), 0 12px 22px rgba(2, 8, 20, 0.42);
+  transform: translateY(-2px) scale(1.04);
+  border-color: rgba(255, 232, 155, 1);
+  box-shadow:
+    0 0 34px rgba(255, 182, 74, 0.42),
+    0 0 0 1px rgba(255, 230, 164, 0.18),
+    0 14px 24px rgba(2, 8, 20, 0.48);
+}
+
+.step-btn.reward-special::after,
+.step-btn.reward-super::after {
+  content: "";
+  position: absolute;
+  top: -140%;
+  left: -30%;
+  width: 42%;
+  height: 320%;
+  transform: rotate(18deg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.2) 48%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.step-btn.reward-special::after {
+  animation: step-shine 3.2s linear infinite;
+}
+
+.step-btn.reward-super::after {
+  animation: step-shine 2.2s linear infinite;
+}
+
+.step-btn.reward-super::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 18px;
+  background: radial-gradient(circle at center, rgba(255, 230, 137, 0.15) 0%, rgba(255, 230, 137, 0) 70%);
+  pointer-events: none;
+  animation: super-step-aura 2.2s ease-in-out infinite;
 }
 
 .step-badge {
@@ -740,6 +796,70 @@ body.reward-shake {
   0% { transform: scale(0.82); opacity: 0; }
   70% { transform: scale(1.06); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes step-shine {
+  0% {
+    left: -34%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  45% {
+    left: 112%;
+    opacity: 0.9;
+  }
+
+  100% {
+    left: 112%;
+    opacity: 0;
+  }
+}
+
+@keyframes super-step-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 24px rgba(255, 180, 67, 0.28),
+      0 0 0 1px rgba(255, 230, 164, 0.12),
+      0 14px 24px rgba(2, 8, 20, 0.48);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow:
+      0 0 34px rgba(255, 188, 82, 0.42),
+      0 0 0 1px rgba(255, 236, 178, 0.2),
+      0 14px 24px rgba(2, 8, 20, 0.48);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 24px rgba(255, 180, 67, 0.28),
+      0 0 0 1px rgba(255, 230, 164, 0.12),
+      0 14px 24px rgba(2, 8, 20, 0.48);
+  }
+}
+
+@keyframes super-step-aura {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+
+  100% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
 }
 
 @keyframes reward-pop-super {

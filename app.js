@@ -3,12 +3,15 @@ import { phrases } from "./data/phrases.js";
 const PHRASES_PER_STEP = 3;
 const PHRASE_TARGET = 5;
 const TOTAL_STEPS = 50;
+const AUTO_ADVANCE_DELAY = 1200;
 
 const STORAGE_KEYS = {
   unlockedSteps: "kids-english-steps-unlocked",
   completedSteps: "kids-english-steps-completed",
   phraseProgress: "kids-english-steps-phrase-progress"
 };
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 const stepsScreenEl = document.getElementById("steps-screen");
 const learningScreenEl = document.getElementById("learning-screen");
@@ -18,18 +21,51 @@ const stepLabelEl = document.getElementById("step-label");
 const phraseStatusEl = document.getElementById("phrase-status");
 const englishEl = document.getElementById("english");
 const koreanEl = document.getElementById("korean");
-const repeatStatusEl = document.getElementById("repeat-status");
+const successSlotsEl = document.getElementById("success-slots");
+const feedbackTextEl = document.getElementById("feedback-text");
 
 const backBtn = document.getElementById("back-btn");
 const speakBtn = document.getElementById("speak-btn");
+const recordBtn = document.getElementById("record-btn");
 const meaningBtn = document.getElementById("meaning-btn");
-const completeBtn = document.getElementById("complete-btn");
 
 let currentStep = null;
 let currentPhraseIndex = 0;
 let meaningVisible = false;
+let advanceTimerId = null;
+let recognition = null;
+let isListening = false;
 
 const state = loadState();
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.addEventListener("start", () => {
+    isListening = true;
+    updateRecordButton();
+    setFeedback("Listening... Say the sentence!", "");
+  });
+
+  recognition.addEventListener("result", (event) => {
+    const transcript = event.results[0][0].transcript;
+    handleSpeechResult(transcript);
+  });
+
+  recognition.addEventListener("error", () => {
+    isListening = false;
+    updateRecordButton();
+    setFeedback("Let's try again. Tap the mic and speak clearly.", "error");
+  });
+
+  recognition.addEventListener("end", () => {
+    isListening = false;
+    updateRecordButton();
+  });
+}
 
 function createInitialState() {
   return {
@@ -110,12 +146,135 @@ function isStepCompleted(stepNumber) {
   return state.completedSteps.includes(stepNumber);
 }
 
+function getCurrentPhrase() {
+  if (!currentStep) {
+    return null;
+  }
+
+  return getStepPhrases(currentStep)[currentPhraseIndex] || null;
+}
+
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levenshteinDistance(source, target) {
+  const rows = source.length + 1;
+  const cols = target.length + 1;
+  const matrix = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+  for (let row = 0; row < rows; row += 1) {
+    matrix[row][0] = row;
+  }
+
+  for (let col = 0; col < cols; col += 1) {
+    matrix[0][col] = col;
+  }
+
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = source[row - 1] === target[col - 1] ? 0 : 1;
+      matrix[row][col] = Math.min(
+        matrix[row - 1][col] + 1,
+        matrix[row][col - 1] + 1,
+        matrix[row - 1][col - 1] + cost
+      );
+    }
+  }
+
+  return matrix[source.length][target.length];
+}
+
+function getSimilarityScore(sourceText, targetText) {
+  const source = normalizeText(sourceText);
+  const target = normalizeText(targetText);
+
+  if (!source || !target) {
+    return 0;
+  }
+
+  const distance = levenshteinDistance(source, target);
+  const maxLength = Math.max(source.length, target.length);
+  const characterScore = maxLength === 0 ? 1 : 1 - distance / maxLength;
+
+  const sourceWords = source.split(" ");
+  const targetWords = target.split(" ");
+  const targetWordSet = new Set(targetWords);
+  const matchedWords = sourceWords.filter((word) => targetWordSet.has(word)).length;
+  const wordScore = matchedWords / targetWords.length;
+
+  return characterScore * 0.6 + wordScore * 0.4;
+}
+
+function isSpeechMatch(spokenText, targetText) {
+  const similarityScore = getSimilarityScore(spokenText, targetText);
+  return similarityScore >= 0.72;
+}
+
 function updateMeaningVisibility() {
-  koreanEl.classList.toggle("hidden", !meaningVisible);
-  meaningBtn.textContent = meaningVisible ? "Hide Meaning" : "Show Meaning";
+  const phrase = getCurrentPhrase();
+  const meaningUnlocked = phrase ? getPhraseProgress(phrase.id) >= PHRASE_TARGET : false;
+
+  meaningBtn.disabled = !meaningUnlocked;
+  koreanEl.classList.toggle("hidden", !meaningVisible || !meaningUnlocked);
+  meaningBtn.textContent = meaningUnlocked
+    ? (meaningVisible ? "Hide Meaning" : "Show Meaning")
+    : "Meaning Locked";
+}
+
+function renderSuccessSlots() {
+  const phrase = getCurrentPhrase();
+  const progress = phrase ? getPhraseProgress(phrase.id) : 0;
+
+  successSlotsEl.innerHTML = "";
+
+  for (let index = 0; index < PHRASE_TARGET; index += 1) {
+    const slot = document.createElement("span");
+    const isComplete = index < progress;
+
+    slot.className = `success-slot${isComplete ? " filled" : ""}`;
+    slot.textContent = isComplete ? "V" : String(index + 1);
+
+    successSlotsEl.appendChild(slot);
+  }
+}
+
+function setFeedback(message, tone) {
+  feedbackTextEl.textContent = message;
+  feedbackTextEl.className = `feedback-text${tone ? ` ${tone}` : ""}`;
+}
+
+function updateRecordButton() {
+  if (!SpeechRecognition) {
+    recordBtn.disabled = true;
+    recordBtn.textContent = "Mic Unavailable";
+    return;
+  }
+
+  recordBtn.disabled = false;
+  recordBtn.textContent = isListening ? "Listening..." : "Start Mic";
+}
+
+function stopRecognition() {
+  if (recognition && isListening) {
+    recognition.stop();
+  }
+}
+
+function clearAdvanceTimer() {
+  if (advanceTimerId) {
+    window.clearTimeout(advanceTimerId);
+    advanceTimerId = null;
+  }
 }
 
 function showStepsScreen() {
+  clearAdvanceTimer();
+  stopRecognition();
   currentStep = null;
   currentPhraseIndex = 0;
   meaningVisible = false;
@@ -159,6 +318,7 @@ function renderSteps() {
 
     if (unlocked) {
       button.addEventListener("click", () => {
+        clearAdvanceTimer();
         currentStep = step;
         currentPhraseIndex = findFirstIncompletePhraseIndex(getStepPhrases(step));
         renderLearningCard();
@@ -175,33 +335,39 @@ function renderLearningCard() {
   const phrase = stepPhrases[currentPhraseIndex];
 
   if (!phrase) {
+    stepLabelEl.textContent = `Step ${currentStep}`;
+    phraseStatusEl.textContent = "Phrase data missing";
     englishEl.textContent = "This step does not have 3 phrases yet.";
     koreanEl.textContent = "";
-    phraseStatusEl.textContent = `Step ${currentStep}`;
-    repeatStatusEl.textContent = "Data missing";
     meaningVisible = false;
-    updateMeaningVisibility();
-    completeBtn.disabled = true;
+    renderSuccessSlots();
+    setFeedback("This step needs more phrase data.", "error");
     speakBtn.disabled = true;
+    recordBtn.disabled = true;
+    updateMeaningVisibility();
     return;
   }
-
-  const progress = getPhraseProgress(phrase.id);
 
   stepLabelEl.textContent = `Step ${currentStep}`;
   phraseStatusEl.textContent = `Phrase ${currentPhraseIndex + 1} / ${stepPhrases.length}`;
   englishEl.textContent = phrase.en;
   koreanEl.textContent = phrase.ko;
-  repeatStatusEl.textContent = `Completed ${progress} / ${PHRASE_TARGET}`;
 
   meaningVisible = false;
-  completeBtn.disabled = false;
   speakBtn.disabled = false;
+  renderSuccessSlots();
   updateMeaningVisibility();
+  updateRecordButton();
+
+  if (!SpeechRecognition) {
+    setFeedback("This browser does not support microphone speech practice.", "error");
+  } else {
+    setFeedback("Press the mic and say the sentence.", "");
+  }
 }
 
 function speakCurrentPhrase() {
-  const phrase = getStepPhrases(currentStep)[currentPhraseIndex];
+  const phrase = getCurrentPhrase();
 
   if (!phrase) {
     return;
@@ -217,39 +383,13 @@ function speakCurrentPhrase() {
 }
 
 function toggleMeaning() {
-  meaningVisible = !meaningVisible;
-  updateMeaningVisibility();
-}
-
-function completeCurrentPhrase() {
-  const stepPhrases = getStepPhrases(currentStep);
-  const phrase = stepPhrases[currentPhraseIndex];
-
-  if (!phrase) {
+  if (meaningBtn.disabled) {
     return;
   }
 
-  const nextProgress = getPhraseProgress(phrase.id) + 1;
-  setPhraseProgress(phrase.id, nextProgress);
-
-  if (getPhraseProgress(phrase.id) >= PHRASE_TARGET) {
-    const nextPhraseIndex = stepPhrases.findIndex(
-      (item) => getPhraseProgress(item.id) < PHRASE_TARGET
-    );
-
-    if (nextPhraseIndex === -1) {
-      completeStep(currentStep);
-      saveState();
-      renderSteps();
-      showStepsScreen();
-      return;
-    }
-
-    currentPhraseIndex = nextPhraseIndex;
-  }
-
-  saveState();
-  renderLearningCard();
+  meaningVisible = !meaningVisible;
+  meaningBtn.textContent = meaningVisible ? "Hide Meaning" : "Show Meaning";
+  updateMeaningVisibility();
 }
 
 function completeStep(stepNumber) {
@@ -263,13 +403,87 @@ function completeStep(stepNumber) {
   }
 }
 
+function moveToNextPhraseOrFinishStep() {
+  const stepPhrases = getStepPhrases(currentStep);
+  const nextPhraseIndex = stepPhrases.findIndex(
+    (item) => getPhraseProgress(item.id) < PHRASE_TARGET
+  );
+
+  if (nextPhraseIndex === -1) {
+    completeStep(currentStep);
+    saveState();
+    renderSteps();
+    showStepsScreen();
+    return;
+  }
+
+  currentPhraseIndex = nextPhraseIndex;
+  renderLearningCard();
+}
+
+function handleSpeechSuccess() {
+  const phrase = getCurrentPhrase();
+
+  if (!phrase) {
+    return;
+  }
+
+  const nextProgress = getPhraseProgress(phrase.id) + 1;
+  setPhraseProgress(phrase.id, nextProgress);
+  saveState();
+  renderSuccessSlots();
+
+  if (getPhraseProgress(phrase.id) >= PHRASE_TARGET) {
+    meaningVisible = false;
+    updateMeaningVisibility();
+    setFeedback("Great job! Phrase cleared!", "success");
+    clearAdvanceTimer();
+    advanceTimerId = window.setTimeout(() => {
+      moveToNextPhraseOrFinishStep();
+    }, AUTO_ADVANCE_DELAY);
+    return;
+  }
+
+  setFeedback("Nice! That was a match.", "success");
+}
+
+function handleSpeechResult(transcript) {
+  const phrase = getCurrentPhrase();
+
+  if (!phrase) {
+    return;
+  }
+
+  if (isSpeechMatch(transcript, phrase.en)) {
+    handleSpeechSuccess();
+  } else {
+    setFeedback(`Good try! We heard: "${transcript}"`, "error");
+  }
+}
+
+function startRecognition() {
+  if (!recognition || isListening) {
+    return;
+  }
+
+  clearAdvanceTimer();
+  meaningVisible = false;
+  updateMeaningVisibility();
+
+  try {
+    recognition.start();
+  } catch {
+    setFeedback("Tap the mic again in a moment.", "error");
+  }
+}
+
 backBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
 });
 speakBtn.addEventListener("click", speakCurrentPhrase);
+recordBtn.addEventListener("click", startRecognition);
 meaningBtn.addEventListener("click", toggleMeaning);
-completeBtn.addEventListener("click", completeCurrentPhrase);
 
 renderSteps();
 showStepsScreen();

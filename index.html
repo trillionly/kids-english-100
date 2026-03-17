@@ -10,14 +10,14 @@
   <div class="app">
     <header class="topbar">
       <h1>Kids English Steps</h1>
-      <p class="subtitle">Simple step-by-step English phrase practice</p>
+      <p class="subtitle">Speak the sentence and clear each step</p>
     </header>
 
     <main>
       <section id="steps-screen">
         <div class="steps-header">
           <h2>Choose a Step</h2>
-          <p>Each step has 3 phrases. Complete each phrase 5 times.</p>
+          <p>Each step has 3 phrases. Say each phrase correctly 5 times.</p>
         </div>
         <div id="steps-grid" class="steps-grid"></div>
       </section>
@@ -28,21 +28,23 @@
         </div>
 
         <div class="card-wrap">
-          <div class="card">
+          <div class="card learning-card">
             <div class="badge">
               <span id="step-label">Step 1</span>
               <span id="phrase-status">Phrase 1 / 3</span>
             </div>
 
+            <p class="prompt-label">Say this sentence</p>
             <p id="english" class="english">It's my turn now.</p>
             <p id="korean" class="korean hidden">이제 내 차례야.</p>
 
-            <p id="repeat-status" class="repeat-status">Completed 0 / 5</p>
+            <div id="success-slots" class="success-slots" aria-label="Success progress"></div>
+            <p id="feedback-text" class="feedback-text">Press the mic and try speaking.</p>
 
             <div class="button-group">
               <button id="speak-btn" class="btn primary" type="button">Listen</button>
-              <button id="meaning-btn" class="btn secondary" type="button">Show Meaning</button>
-              <button id="complete-btn" class="btn accent" type="button">Complete</button>
+              <button id="record-btn" class="btn mic-btn" type="button">Start Mic</button>
+              <button id="meaning-btn" class="btn secondary" type="button" disabled>Show Meaning</button>
             </div>
           </div>
         </div>

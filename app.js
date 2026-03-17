@@ -66,6 +66,7 @@ const rewardCardEl = document.getElementById("reward-card");
 const rewardPreviewEl = document.getElementById("reward-preview");
 const rewardCardIdEl = document.getElementById("reward-card-id");
 const rewardCardTypeEl = document.getElementById("reward-card-type");
+const rewardBurstEl = document.getElementById("reward-burst");
 const rewardSparklesEl = document.getElementById("reward-sparkles");
 const rewardCloseBtn = document.getElementById("reward-close-btn");
 
@@ -83,6 +84,7 @@ let currentReviewIndex = 0;
 let reviewProgress = [];
 let audioContext = null;
 let hasInitialized = false;
+let rewardEffectTimerId = null;
 
 const state = loadState();
 
@@ -486,6 +488,28 @@ function playTone(startTime, frequency, duration, volume, type) {
   oscillator.stop(startTime + duration);
 }
 
+function playSweep(startTime, fromFrequency, toFrequency, duration, volume, type) {
+  const context = getAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(fromFrequency, startTime);
+  oscillator.frequency.exponentialRampToValueAtTime(toFrequency, startTime + duration);
+  gainNode.gain.setValueAtTime(0.0001, startTime);
+  gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.03);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(context.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration);
+}
+
 function playRewardSound(cardType) {
   const context = getAudioContext();
   if (!context) {
@@ -499,21 +523,35 @@ function playRewardSound(cardType) {
   const start = context.currentTime + 0.01;
 
   if (cardType === "super") {
-    playTone(start, 392, 0.22, 0.16, "triangle");
-    playTone(start + 0.12, 523.25, 0.28, 0.18, "triangle");
-    playTone(start + 0.26, 783.99, 0.45, 0.2, "sine");
+    playTone(start, 196, 0.2, 0.12, "triangle");
+    playTone(start + 0.1, 293.66, 0.22, 0.13, "triangle");
+    playTone(start + 0.2, 392, 0.26, 0.14, "sawtooth");
+    playSweep(start + 0.16, 240, 620, 0.5, 0.12, "triangle");
+    playTone(start + 0.42, 783.99, 0.48, 0.16, "sine");
     return;
   }
 
   if (cardType === "special") {
-    playTone(start, 659.25, 0.18, 0.1, "sine");
-    playTone(start + 0.1, 783.99, 0.24, 0.12, "triangle");
-    playTone(start + 0.2, 987.77, 0.28, 0.1, "sine");
+    playTone(start, 659.25, 0.16, 0.08, "sine");
+    playTone(start + 0.08, 783.99, 0.2, 0.1, "triangle");
+    playTone(start + 0.18, 987.77, 0.26, 0.08, "sine");
     return;
   }
 
-  playTone(start, 523.25, 0.12, 0.08, "sine");
-  playTone(start + 0.07, 659.25, 0.14, 0.06, "triangle");
+  playTone(start, 880, 0.08, 0.05, "sine");
+  playTone(start + 0.05, 1174.66, 0.1, 0.04, "triangle");
+}
+
+function clearRewardEffects() {
+  if (rewardEffectTimerId) {
+    window.clearTimeout(rewardEffectTimerId);
+    rewardEffectTimerId = null;
+  }
+
+  document.body.classList.remove("reward-shake");
+  rewardBurstEl.classList.add("hidden");
+  rewardBurstEl.classList.remove("active");
+  rewardSparklesEl.classList.remove("super");
 }
 
 function openRewardModal(card) {
@@ -521,18 +559,32 @@ function openRewardModal(card) {
     return;
   }
 
+  clearRewardEffects();
   rewardCardEl.className = `modal-card reward-card ${card.type}`;
   rewardPreviewEl.className = `card-detail-preview ${card.type}`;
   rewardPreviewEl.textContent = card.type.toUpperCase();
   rewardCardIdEl.textContent = card.id;
   rewardCardTypeEl.textContent = `Type: ${card.type}`;
   rewardSparklesEl.classList.toggle("hidden", card.type === "normal");
+  rewardSparklesEl.classList.toggle("super", card.type === "super");
+  rewardBurstEl.classList.toggle("hidden", card.type !== "super");
   rewardModalEl.classList.remove("hidden");
   rewardModalEl.hidden = false;
+
+  if (card.type === "super") {
+    document.body.classList.add("reward-shake");
+    rewardBurstEl.classList.add("active");
+    rewardEffectTimerId = window.setTimeout(() => {
+      document.body.classList.remove("reward-shake");
+      rewardBurstEl.classList.remove("active");
+    }, 650);
+  }
+
   playRewardSound(card.type);
 }
 
 function closeRewardModal() {
+  clearRewardEffects();
   rewardModalEl.classList.add("hidden");
   rewardModalEl.hidden = true;
   rewardCardEl.className = "modal-card reward-card";

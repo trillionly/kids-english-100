@@ -12,6 +12,10 @@ body {
   color: #1f2a44;
 }
 
+body.reward-shake {
+  animation: reward-screen-shake 0.45s ease-out;
+}
+
 .app {
   min-height: 100vh;
   padding: 24px 16px 40px;
@@ -470,6 +474,108 @@ body {
   pointer-events: none;
 }
 
+.reward-sparkles.super .sparkle {
+  width: 18px;
+  height: 18px;
+}
+
+.reward-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.burst-ring,
+.burst-dot {
+  position: absolute;
+  opacity: 0;
+}
+
+.burst-ring {
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 243, 170, 0.9);
+  transform: translate(-50%, -50%) scale(0.4);
+}
+
+.burst-ring-2 {
+  width: 180px;
+  height: 180px;
+  border-color: rgba(180, 133, 255, 0.8);
+}
+
+.burst-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7b8 0%, #b785ff 60%, rgba(183, 133, 255, 0) 70%);
+}
+
+.burst-dot-1 {
+  top: 20%;
+  left: 18%;
+}
+
+.burst-dot-2 {
+  top: 18%;
+  right: 18%;
+}
+
+.burst-dot-3 {
+  top: 44%;
+  left: 8%;
+}
+
+.burst-dot-4 {
+  top: 44%;
+  right: 8%;
+}
+
+.burst-dot-5 {
+  bottom: 18%;
+  left: 24%;
+}
+
+.burst-dot-6 {
+  bottom: 18%;
+  right: 24%;
+}
+
+.reward-burst.active .burst-ring-1 {
+  animation: burst-ring 0.65s ease-out;
+}
+
+.reward-burst.active .burst-ring-2 {
+  animation: burst-ring 0.65s ease-out 0.05s;
+}
+
+.reward-burst.active .burst-dot-1 {
+  animation: burst-dot-up-left 0.65s ease-out;
+}
+
+.reward-burst.active .burst-dot-2 {
+  animation: burst-dot-up-right 0.65s ease-out;
+}
+
+.reward-burst.active .burst-dot-3 {
+  animation: burst-dot-left 0.65s ease-out;
+}
+
+.reward-burst.active .burst-dot-4 {
+  animation: burst-dot-right 0.65s ease-out;
+}
+
+.reward-burst.active .burst-dot-5 {
+  animation: burst-dot-down-left 0.65s ease-out;
+}
+
+.reward-burst.active .burst-dot-6 {
+  animation: burst-dot-down-right 0.65s ease-out;
+}
+
 .sparkle {
   position: absolute;
   width: 14px;
@@ -629,6 +735,144 @@ body {
   100% {
     transform: translateY(-16px) scale(1.1);
     opacity: 0;
+  }
+}
+
+@keyframes reward-screen-shake {
+  0% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-4px);
+  }
+
+  40% {
+    transform: translateX(4px);
+  }
+
+  60% {
+    transform: translateX(-3px);
+  }
+
+  80% {
+    transform: translateX(3px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes burst-ring {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+
+@keyframes burst-dot-up-left {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-26px, -30px) scale(1.2);
+  }
+}
+
+@keyframes burst-dot-up-right {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(26px, -30px) scale(1.2);
+  }
+}
+
+@keyframes burst-dot-left {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-34px, 0) scale(1.2);
+  }
+}
+
+@keyframes burst-dot-right {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(34px, 0) scale(1.2);
+  }
+}
+
+@keyframes burst-dot-down-left {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-22px, 26px) scale(1.2);
+  }
+}
+
+@keyframes burst-dot-down-right {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(22px, 26px) scale(1.2);
   }
 }
 

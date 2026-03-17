@@ -82,6 +82,7 @@ let reviewQueue = [];
 let currentReviewIndex = 0;
 let reviewProgress = [];
 let audioContext = null;
+let hasInitialized = false;
 
 const state = loadState();
 
@@ -504,6 +505,10 @@ function playRewardSound(cardType) {
 }
 
 function openRewardModal(card) {
+  if (!hasInitialized || !card) {
+    return;
+  }
+
   rewardCardEl.className = `modal-card reward-card ${card.type}`;
   rewardPreviewEl.className = `card-detail-preview ${card.type}`;
   rewardPreviewEl.textContent = card.type.toUpperCase();
@@ -511,11 +516,13 @@ function openRewardModal(card) {
   rewardCardTypeEl.textContent = `Type: ${card.type}`;
   rewardSparklesEl.classList.toggle("hidden", card.type === "normal");
   rewardModalEl.classList.remove("hidden");
+  rewardModalEl.hidden = false;
   playRewardSound(card.type);
 }
 
 function closeRewardModal() {
   rewardModalEl.classList.add("hidden");
+  rewardModalEl.hidden = true;
   rewardCardEl.className = "modal-card reward-card";
   rewardPreviewEl.className = "card-detail-preview";
   rewardSparklesEl.classList.add("hidden");
@@ -1029,3 +1036,4 @@ rewardModalEl.addEventListener("click", (event) => {
 
 renderSteps();
 showStepsScreen();
+hasInitialized = true;

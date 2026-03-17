@@ -440,7 +440,7 @@ function getCardClass(type) {
 
 function getCardImagePath(card) {
   const extension = card.type === "super" ? "gif" : "png";
-  return `/cards/${card.type}/${card.id}.${extension}`;
+  return `./cards/${card.type}/${card.id}.${extension}`;
 }
 
 function getCardSectionTitle(type) {

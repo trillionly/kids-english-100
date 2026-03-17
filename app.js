@@ -59,6 +59,7 @@ const reviewStartBtn = document.getElementById("review-start-btn");
 const speakBtn = document.getElementById("speak-btn");
 const recordBtn = document.getElementById("record-btn");
 const meaningBtn = document.getElementById("meaning-btn");
+const nextBtn = document.getElementById("next-btn");
 
 const cardDetailModalEl = document.getElementById("card-detail-modal");
 const cardDetailPreviewEl = document.getElementById("card-detail-preview");
@@ -712,6 +713,13 @@ function updateMeaningVisibility() {
     : "Meaning Locked";
 }
 
+function updateNextButton() {
+  const phrase = getCurrentPhrase();
+  const canMoveNext = phrase ? getPhraseProgress(phrase.id) >= PHRASE_TARGET : false;
+
+  nextBtn.disabled = !canMoveNext;
+}
+
 function renderSuccessSlots() {
   const phrase = getCurrentPhrase();
   const progress = phrase ? getPhraseProgress(phrase.id) : 0;
@@ -969,6 +977,7 @@ function renderLearningCard() {
     setFeedback("This step needs more phrase data.", "error");
     speakBtn.disabled = true;
     recordBtn.disabled = true;
+    nextBtn.disabled = true;
     updateMeaningVisibility();
     return;
   }
@@ -981,6 +990,7 @@ function renderLearningCard() {
   speakBtn.disabled = false;
   renderSuccessSlots();
   updateMeaningVisibility();
+  updateNextButton();
   updateRecordButtons();
 
   if (!SpeechRecognition) {
@@ -1075,6 +1085,16 @@ function moveToNextPhraseOrFinishStep() {
   renderLearningCard();
 }
 
+function moveForward() {
+  const phrase = getCurrentPhrase();
+
+  if (!phrase || getPhraseProgress(phrase.id) < PHRASE_TARGET) {
+    return;
+  }
+
+  moveToNextPhraseOrFinishStep();
+}
+
 function advanceReview() {
   currentReviewIndex += 1;
   renderReviewCard();
@@ -1113,11 +1133,8 @@ function handleSpeechSuccess() {
   if (getPhraseProgress(phrase.id) >= PHRASE_TARGET) {
     meaningVisible = false;
     updateMeaningVisibility();
-    setFeedback("Great job! Phrase cleared!", "success");
-    clearAdvanceTimer();
-    advanceTimerId = window.setTimeout(() => {
-      moveToNextPhraseOrFinishStep();
-    }, AUTO_ADVANCE_DELAY);
+    updateNextButton();
+    setFeedback("Great job! Phrase cleared! Press Next.", "success");
     return;
   }
 
@@ -1228,6 +1245,7 @@ reviewStartBtn.addEventListener("click", () => {
 speakBtn.addEventListener("click", speakCurrentPhrase);
 recordBtn.addEventListener("click", startRecognition);
 meaningBtn.addEventListener("click", toggleMeaning);
+nextBtn.addEventListener("click", moveForward);
 cardDetailCloseBtn.addEventListener("click", closeCardDetail);
 cardDetailModalEl.addEventListener("click", (event) => {
   if (event.target === cardDetailModalEl || event.target.classList.contains("modal-backdrop")) {

@@ -1,1 +1,47 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f8ff;
+  text-align: center;
+  margin: 0;
+}
 
+.app {
+  padding: 20px;
+}
+
+h1 {
+  color: #333;
+}
+
+.card {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  margin: 20px auto;
+  width: 80%;
+  max-width: 300px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+#english {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+#korean {
+  font-size: 18px;
+  color: #666;
+}
+
+button {
+  padding: 15px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.8;
+}

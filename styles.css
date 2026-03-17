@@ -236,6 +236,10 @@ body {
   display: none;
 }
 
+.btn.hidden {
+  display: none;
+}
+
 .button-group {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

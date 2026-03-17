@@ -2,6 +2,7 @@ import { phrases } from "./data/phrases.js";
 
 const PHRASES_PER_STEP = 3;
 const PHRASE_TARGET = 5;
+const REVIEW_TARGET = 1;
 const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
 
@@ -15,9 +16,17 @@ const STORAGE_KEYS = {
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 const stepsScreenEl = document.getElementById("steps-screen");
+const reviewScreenEl = document.getElementById("review-screen");
 const learningScreenEl = document.getElementById("learning-screen");
 const stepsGridEl = document.getElementById("steps-grid");
 const stepsMessageEl = document.getElementById("steps-message");
+
+const reviewStepLabelEl = document.getElementById("review-step-label");
+const reviewStatusEl = document.getElementById("review-status");
+const reviewEnglishEl = document.getElementById("review-english");
+const reviewKoreanEl = document.getElementById("review-korean");
+const reviewSlotsEl = document.getElementById("review-slots");
+const reviewFeedbackEl = document.getElementById("review-feedback");
 
 const stepLabelEl = document.getElementById("step-label");
 const phraseStatusEl = document.getElementById("phrase-status");
@@ -26,8 +35,12 @@ const koreanEl = document.getElementById("korean");
 const successSlotsEl = document.getElementById("success-slots");
 const feedbackTextEl = document.getElementById("feedback-text");
 
+const reviewBackBtn = document.getElementById("review-back-btn");
 const backBtn = document.getElementById("back-btn");
 const resetBtn = document.getElementById("reset-btn");
+const reviewListenBtn = document.getElementById("review-listen-btn");
+const reviewRecordBtn = document.getElementById("review-record-btn");
+const reviewStartBtn = document.getElementById("review-start-btn");
 const speakBtn = document.getElementById("speak-btn");
 const recordBtn = document.getElementById("record-btn");
 const meaningBtn = document.getElementById("meaning-btn");
@@ -39,6 +52,12 @@ let advanceTimerId = null;
 let recognition = null;
 let isListening = false;
 
+let currentMode = "learning";
+let pendingStep = null;
+let reviewQueue = [];
+let currentReviewIndex = 0;
+let reviewProgress = [];
+
 const state = loadState();
 
 if (SpeechRecognition) {
@@ -49,8 +68,13 @@ if (SpeechRecognition) {
 
   recognition.addEventListener("start", () => {
     isListening = true;
-    updateRecordButton();
-    setFeedback("Listening... Say the sentence!", "");
+    updateRecordButtons();
+
+    if (currentMode === "review") {
+      setReviewFeedback("Listening... Say the sentence!", "");
+    } else {
+      setFeedback("Listening... Say the sentence!", "");
+    }
   });
 
   recognition.addEventListener("result", (event) => {
@@ -60,13 +84,18 @@ if (SpeechRecognition) {
 
   recognition.addEventListener("error", () => {
     isListening = false;
-    updateRecordButton();
-    setFeedback("Let's try again. Tap the mic and speak clearly.", "error");
+    updateRecordButtons();
+
+    if (currentMode === "review") {
+      setReviewFeedback("Let's try again. Tap the mic and speak clearly.", "error");
+    } else {
+      setFeedback("Let's try again. Tap the mic and speak clearly.", "error");
+    }
   });
 
   recognition.addEventListener("end", () => {
     isListening = false;
-    updateRecordButton();
+    updateRecordButtons();
   });
 }
 
@@ -158,6 +187,10 @@ function getCurrentPhrase() {
   }
 
   return getStepPhrases(currentStep)[currentPhraseIndex] || null;
+}
+
+function getCurrentReviewItem() {
+  return reviewQueue[currentReviewIndex] || null;
 }
 
 function normalizeText(text) {
@@ -337,9 +370,24 @@ function renderSuccessSlots() {
   }
 }
 
+function renderReviewSlots() {
+  const progress = reviewProgress[currentReviewIndex] || 0;
+  reviewSlotsEl.innerHTML = "";
+
+  const slot = document.createElement("span");
+  slot.className = `success-slot${progress >= REVIEW_TARGET ? " filled" : ""}`;
+  slot.textContent = progress >= REVIEW_TARGET ? "V" : "1";
+  reviewSlotsEl.appendChild(slot);
+}
+
 function setFeedback(message, tone) {
   feedbackTextEl.textContent = message;
   feedbackTextEl.className = `feedback-text${tone ? ` ${tone}` : ""}`;
+}
+
+function setReviewFeedback(message, tone) {
+  reviewFeedbackEl.textContent = message;
+  reviewFeedbackEl.className = `feedback-text${tone ? ` ${tone}` : ""}`;
 }
 
 function setStepsMessage(message) {
@@ -347,15 +395,19 @@ function setStepsMessage(message) {
   stepsMessageEl.classList.toggle("hidden", !message);
 }
 
-function updateRecordButton() {
+function updateRecordButtons() {
   if (!SpeechRecognition) {
     recordBtn.disabled = true;
     recordBtn.textContent = "🎤 Mic Unavailable";
+    reviewRecordBtn.disabled = true;
+    reviewRecordBtn.textContent = "🎤 Mic Unavailable";
     return;
   }
 
   recordBtn.disabled = false;
+  reviewRecordBtn.disabled = false;
   recordBtn.textContent = isListening ? "🎤 Listening..." : "🎤 Start Mic";
+  reviewRecordBtn.textContent = isListening ? "🎤 Listening..." : "🎤 Start Mic";
 }
 
 function stopRecognition() {
@@ -374,16 +426,32 @@ function clearAdvanceTimer() {
 function showStepsScreen() {
   clearAdvanceTimer();
   stopRecognition();
+  currentMode = "steps";
   currentStep = null;
   currentPhraseIndex = 0;
   meaningVisible = false;
+  pendingStep = null;
+  reviewQueue = [];
+  currentReviewIndex = 0;
+  reviewProgress = [];
   stepsScreenEl.classList.remove("hidden");
+  reviewScreenEl.classList.add("hidden");
+  learningScreenEl.classList.add("hidden");
+}
+
+function showReviewScreen() {
+  setStepsMessage("");
+  currentMode = "review";
+  stepsScreenEl.classList.add("hidden");
+  reviewScreenEl.classList.remove("hidden");
   learningScreenEl.classList.add("hidden");
 }
 
 function showLearningScreen() {
   setStepsMessage("");
+  currentMode = "learning";
   stepsScreenEl.classList.add("hidden");
+  reviewScreenEl.classList.add("hidden");
   learningScreenEl.classList.remove("hidden");
 }
 
@@ -393,6 +461,46 @@ function findFirstIncompletePhraseIndex(stepPhrases) {
   );
 
   return incompleteIndex === -1 ? 0 : incompleteIndex;
+}
+
+function getReviewTargets(stepNumber) {
+  return [stepNumber - 1, stepNumber - 5, stepNumber - 10]
+    .filter((targetStep) => targetStep >= 1)
+    .map((targetStep) => {
+      const phrasesForStep = getStepPhrases(targetStep);
+      return phrasesForStep.length > 0
+        ? { stepNumber: targetStep, phrase: phrasesForStep[0] }
+        : null;
+    })
+    .filter(Boolean);
+}
+
+function startSelectedStep(step) {
+  clearAdvanceTimer();
+  currentStep = step;
+  currentPhraseIndex = findFirstIncompletePhraseIndex(getStepPhrases(step));
+  renderLearningCard();
+  showLearningScreen();
+}
+
+function beginStep(step) {
+  if (isStepCompleted(step) || step === 1) {
+    startSelectedStep(step);
+    return;
+  }
+
+  pendingStep = step;
+  reviewQueue = getReviewTargets(step);
+  reviewProgress = reviewQueue.map(() => 0);
+  currentReviewIndex = 0;
+
+  if (reviewQueue.length === 0) {
+    startSelectedStep(step);
+    return;
+  }
+
+  renderReviewCard();
+  showReviewScreen();
 }
 
 function renderSteps() {
@@ -418,16 +526,40 @@ function renderSteps() {
 
     if (unlocked) {
       button.addEventListener("click", () => {
-        clearAdvanceTimer();
-        currentStep = step;
-        currentPhraseIndex = findFirstIncompletePhraseIndex(getStepPhrases(step));
-        renderLearningCard();
-        showLearningScreen();
+        beginStep(step);
       });
     }
 
     stepsGridEl.appendChild(button);
   }
+}
+
+function renderReviewCard() {
+  const item = getCurrentReviewItem();
+
+  if (!item) {
+    reviewStepLabelEl.textContent = "Review Clear";
+    reviewStatusEl.textContent = "Ready";
+    reviewEnglishEl.textContent = "All review items are done.";
+    reviewKoreanEl.textContent = "";
+    renderReviewSlots();
+    setReviewFeedback("Nice! You can start the new step.", "success");
+    reviewRecordBtn.classList.add("hidden");
+    reviewListenBtn.classList.add("hidden");
+    reviewStartBtn.classList.remove("hidden");
+    return;
+  }
+
+  reviewStepLabelEl.textContent = `Review Step ${item.stepNumber}`;
+  reviewStatusEl.textContent = `Item ${currentReviewIndex + 1} / ${reviewQueue.length}`;
+  reviewEnglishEl.textContent = item.phrase.en;
+  reviewKoreanEl.textContent = item.phrase.ko;
+  renderReviewSlots();
+  setReviewFeedback("Press the mic and say the sentence once.", "");
+  reviewRecordBtn.classList.remove("hidden");
+  reviewListenBtn.classList.remove("hidden");
+  reviewStartBtn.classList.add("hidden");
+  updateRecordButtons();
 }
 
 function renderLearningCard() {
@@ -457,13 +589,23 @@ function renderLearningCard() {
   speakBtn.disabled = false;
   renderSuccessSlots();
   updateMeaningVisibility();
-  updateRecordButton();
+  updateRecordButtons();
 
   if (!SpeechRecognition) {
     setFeedback("This browser does not support microphone speech practice.", "error");
   } else {
     setFeedback("Press the mic and say the sentence.", "");
   }
+}
+
+function speakPhrase(text) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 0.95;
+  utterance.pitch = 1;
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 function speakCurrentPhrase() {
@@ -473,13 +615,17 @@ function speakCurrentPhrase() {
     return;
   }
 
-  const utterance = new SpeechSynthesisUtterance(phrase.en);
-  utterance.lang = "en-US";
-  utterance.rate = 0.95;
-  utterance.pitch = 1;
+  speakPhrase(phrase.en);
+}
 
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+function speakCurrentReviewPhrase() {
+  const item = getCurrentReviewItem();
+
+  if (!item) {
+    return;
+  }
+
+  speakPhrase(item.phrase.en);
 }
 
 function toggleMeaning() {
@@ -488,7 +634,6 @@ function toggleMeaning() {
   }
 
   meaningVisible = !meaningVisible;
-  meaningBtn.textContent = meaningVisible ? "Hide Meaning" : "Show Meaning";
   updateMeaningVisibility();
 }
 
@@ -542,7 +687,29 @@ function moveToNextPhraseOrFinishStep() {
   renderLearningCard();
 }
 
+function advanceReview() {
+  currentReviewIndex += 1;
+
+  if (currentReviewIndex >= reviewQueue.length) {
+    renderReviewCard();
+    return;
+  }
+
+  renderReviewCard();
+}
+
 function handleSpeechSuccess() {
+  if (currentMode === "review") {
+    reviewProgress[currentReviewIndex] = REVIEW_TARGET;
+    renderReviewSlots();
+    setReviewFeedback("Nice review! Let's go on.", "success");
+    clearAdvanceTimer();
+    advanceTimerId = window.setTimeout(() => {
+      advanceReview();
+    }, AUTO_ADVANCE_DELAY);
+    return;
+  }
+
   const phrase = getCurrentPhrase();
 
   if (!phrase) {
@@ -569,14 +736,17 @@ function handleSpeechSuccess() {
 }
 
 function handleSpeechResult(transcript) {
-  const phrase = getCurrentPhrase();
+  const targetText =
+    currentMode === "review" ? getCurrentReviewItem()?.phrase.en : getCurrentPhrase()?.en;
 
-  if (!phrase) {
+  if (!targetText) {
     return;
   }
 
-  if (isSpeechMatch(transcript, phrase.en)) {
+  if (isSpeechMatch(transcript, targetText)) {
     handleSpeechSuccess();
+  } else if (currentMode === "review") {
+    setReviewFeedback(`Good try! We heard: "${transcript}"`, "error");
   } else {
     setFeedback(`Good try! We heard: "${transcript}"`, "error");
   }
@@ -588,13 +758,20 @@ function startRecognition() {
   }
 
   clearAdvanceTimer();
-  meaningVisible = false;
-  updateMeaningVisibility();
+
+  if (currentMode === "learning") {
+    meaningVisible = false;
+    updateMeaningVisibility();
+  }
 
   try {
     recognition.start();
   } catch {
-    setFeedback("Tap the mic again in a moment.", "error");
+    if (currentMode === "review") {
+      setReviewFeedback("Tap the mic again in a moment.", "error");
+    } else {
+      setFeedback("Tap the mic again in a moment.", "error");
+    }
   }
 }
 
@@ -617,11 +794,22 @@ function resetProgress() {
   window.location.reload();
 }
 
+reviewBackBtn.addEventListener("click", () => {
+  renderSteps();
+  showStepsScreen();
+});
 backBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
 });
 resetBtn.addEventListener("click", resetProgress);
+reviewListenBtn.addEventListener("click", speakCurrentReviewPhrase);
+reviewRecordBtn.addEventListener("click", startRecognition);
+reviewStartBtn.addEventListener("click", () => {
+  if (pendingStep) {
+    startSelectedStep(pendingStep);
+  }
+});
 speakBtn.addEventListener("click", speakCurrentPhrase);
 recordBtn.addEventListener("click", startRecognition);
 meaningBtn.addEventListener("click", toggleMeaning);

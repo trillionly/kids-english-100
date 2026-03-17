@@ -24,6 +24,34 @@
         <div id="steps-grid" class="steps-grid"></div>
       </section>
 
+      <section id="review-screen" class="hidden">
+        <div class="learning-header">
+          <button id="review-back-btn" class="text-btn" type="button">Back to Steps</button>
+        </div>
+
+        <div class="card-wrap">
+          <div class="card learning-card">
+            <div class="badge">
+              <span id="review-step-label">Review</span>
+              <span id="review-status">Item 1 / 1</span>
+            </div>
+
+            <p class="prompt-label">Shall we review what we learned before?</p>
+            <p id="review-english" class="english">It's my turn now.</p>
+            <p id="review-korean" class="korean hidden">이제 내 차례야.</p>
+
+            <div id="review-slots" class="success-slots" aria-label="Review progress"></div>
+            <p id="review-feedback" class="feedback-text">Press the mic and say the sentence once.</p>
+
+            <div class="button-group">
+              <button id="review-listen-btn" class="btn primary" type="button">👂 Listen</button>
+              <button id="review-record-btn" class="btn mic-btn" type="button">🎤 Start Mic</button>
+              <button id="review-start-btn" class="btn secondary hidden" type="button">Start Step</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="learning-screen" class="hidden">
         <div class="learning-header">
           <button id="back-btn" class="text-btn" type="button">Back to Steps</button>

@@ -162,6 +162,41 @@ function normalizeText(text) {
     .trim();
 }
 
+function normalizeWord(word) {
+  return word
+    .replace(/^'+|'+$/g, "")
+    .replace(/'(s|re|ve|ll|d|m|t)$/g, "");
+}
+
+function getKeywords(text) {
+  const stopWords = new Set([
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "am",
+    "to",
+    "my",
+    "your",
+    "me",
+    "i",
+    "it",
+    "this",
+    "that",
+    "we",
+    "you",
+    "now",
+    "do",
+    "be"
+  ]);
+
+  return normalizeText(text)
+    .split(" ")
+    .map(normalizeWord)
+    .filter((word) => word && !stopWords.has(word));
+}
+
 function levenshteinDistance(source, target) {
   const rows = source.length + 1;
   const cols = target.length + 1;
@@ -210,9 +245,62 @@ function getSimilarityScore(sourceText, targetText) {
   return characterScore * 0.6 + wordScore * 0.4;
 }
 
+function getKeywordScore(spokenText, targetText) {
+  const spokenKeywords = getKeywords(spokenText);
+  const targetKeywords = getKeywords(targetText);
+
+  if (targetKeywords.length === 0) {
+    return 0;
+  }
+
+  const spokenSet = new Set(spokenKeywords);
+  const directMatches = targetKeywords.filter((word) => spokenSet.has(word)).length;
+  let softMatches = 0;
+
+  targetKeywords.forEach((targetWord) => {
+    if (spokenSet.has(targetWord)) {
+      return;
+    }
+
+    const hasCloseWord = spokenKeywords.some((spokenWord) => {
+      if (!spokenWord) {
+        return false;
+      }
+
+      if (spokenWord.startsWith(targetWord) || targetWord.startsWith(spokenWord)) {
+        return true;
+      }
+
+      return getSimilarityScore(spokenWord, targetWord) >= 0.74;
+    });
+
+    if (hasCloseWord) {
+      softMatches += 1;
+    }
+  });
+
+  return (directMatches + softMatches * 0.8) / targetKeywords.length;
+}
+
 function isSpeechMatch(spokenText, targetText) {
-  const similarityScore = getSimilarityScore(spokenText, targetText);
-  return similarityScore >= 0.72;
+  const overallScore = getSimilarityScore(spokenText, targetText);
+  const keywordScore = getKeywordScore(spokenText, targetText);
+  const targetKeywords = getKeywords(targetText);
+  const matchedKeywords = keywordScore * targetKeywords.length;
+
+  if (overallScore >= 0.68) {
+    return true;
+  }
+
+  if (targetKeywords.length <= 2 && keywordScore >= 0.5) {
+    return true;
+  }
+
+  if (targetKeywords.length >= 3 && matchedKeywords >= 2 && keywordScore >= 0.58) {
+    return true;
+  }
+
+  return overallScore >= 0.56 && keywordScore >= 0.72;
 }
 
 function updateMeaningVisibility() {

@@ -9,28 +9,44 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <h1>Kids English 100</h1>
-      <p class="subtitle">Simple English phrase practice for kids</p>
+      <h1>Kids English Steps</h1>
+      <p class="subtitle">Simple step-by-step English phrase practice</p>
     </header>
 
-    <div id="category-filters" class="filter-group"></div>
+    <main>
+      <section id="steps-screen">
+        <div class="steps-header">
+          <h2>Choose a Step</h2>
+          <p>Each step has 3 phrases. Complete each phrase 5 times.</p>
+        </div>
+        <div id="steps-grid" class="steps-grid"></div>
+      </section>
 
-    <main class="card-wrap">
-      <div class="card">
-        <div class="badge">
-          <span id="phrase-number">1 / 100</span>
-          <span id="phrase-category">Play</span>
+      <section id="learning-screen" class="hidden">
+        <div class="learning-header">
+          <button id="back-btn" class="text-btn" type="button">Back to Steps</button>
         </div>
 
-        <p id="english" class="english">It's my turn now.</p>
-        <p id="korean" class="korean hidden">이제 내 차례야.</p>
+        <div class="card-wrap">
+          <div class="card">
+            <div class="badge">
+              <span id="step-label">Step 1</span>
+              <span id="phrase-status">Phrase 1 / 3</span>
+            </div>
 
-        <div class="button-group">
-          <button id="speak-btn" class="btn primary" type="button">Listen</button>
-          <button id="meaning-btn" class="btn secondary" type="button">Show Meaning</button>
-          <button id="next-btn" class="btn accent" type="button">Next</button>
+            <p id="english" class="english">It's my turn now.</p>
+            <p id="korean" class="korean hidden">이제 내 차례야.</p>
+
+            <p id="repeat-status" class="repeat-status">Completed 0 / 5</p>
+
+            <div class="button-group">
+              <button id="speak-btn" class="btn primary" type="button">Listen</button>
+              <button id="meaning-btn" class="btn secondary" type="button">Show Meaning</button>
+              <button id="complete-btn" class="btn accent" type="button">Complete</button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   </div>
 

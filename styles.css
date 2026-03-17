@@ -1280,14 +1280,15 @@ body.reward-shake {
   }
 
   .reset-btn {
-    top: auto;
-    bottom: -6px;
+    top: 0;
+    right: 0;
+    bottom: auto;
   }
 
   .test-mode-btn {
-    top: auto;
-    right: 92px;
-    bottom: -6px;
+    top: 42px;
+    right: 0;
+    bottom: auto;
   }
 
   .button-group {

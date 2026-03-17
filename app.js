@@ -392,6 +392,15 @@ function giveStepRewards(stepNumber) {
   addCard(getRewardCard("normal", stepNumber));
 }
 
+function awardCardForCompletedStep(stepNumber) {
+  if (state.completedSteps.includes(stepNumber)) {
+    return;
+  }
+
+  state.completedSteps.push(stepNumber);
+  giveStepRewards(stepNumber);
+}
+
 function getAllCardSlots() {
   const slots = [];
 
@@ -739,10 +748,7 @@ function toggleMeaning() {
 }
 
 function completeStep(stepNumber) {
-  if (!state.completedSteps.includes(stepNumber)) {
-    state.completedSteps.push(stepNumber);
-    giveStepRewards(stepNumber);
-  }
+  awardCardForCompletedStep(stepNumber);
 
   const nextStep = stepNumber + 1;
   const today = new Date().toISOString().slice(0, 10);
@@ -922,5 +928,4 @@ cardDetailModalEl.addEventListener("click", (event) => {
 });
 
 renderSteps();
-renderCardBox();
 showStepsScreen();

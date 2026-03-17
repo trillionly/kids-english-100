@@ -1,5 +1,7 @@
 import { phrases } from "./data/phrases.js";
 
+const STORAGE_KEY = "kids-english-100-current-index";
+
 let currentIndex = 0;
 let meaningVisible = false;
 let activeCategory = "all";
@@ -40,6 +42,26 @@ function updateMeaningVisibility() {
   meaningBtn.textContent = meaningVisible ? "Hide Meaning" : "Show Meaning";
 }
 
+function saveProgress() {
+  const visiblePhrases = getVisiblePhrases();
+  const phrase = visiblePhrases[currentIndex];
+
+  if (!phrase) {
+    return;
+  }
+
+  const phraseIndex = phrases.findIndex((item) => item.id === phrase.id);
+  window.localStorage.setItem(STORAGE_KEY, String(phraseIndex));
+}
+
+function loadProgress() {
+  const savedIndex = Number.parseInt(window.localStorage.getItem(STORAGE_KEY), 10);
+
+  if (Number.isInteger(savedIndex) && savedIndex >= 0 && savedIndex < phrases.length) {
+    currentIndex = savedIndex;
+  }
+}
+
 function renderCard() {
   const visiblePhrases = getVisiblePhrases();
   const phrase = visiblePhrases[currentIndex];
@@ -73,6 +95,7 @@ function toggleMeaning() {
 function nextCard() {
   const visiblePhrases = getVisiblePhrases();
   currentIndex = (currentIndex + 1) % visiblePhrases.length;
+  saveProgress();
   renderCard();
 }
 
@@ -100,5 +123,6 @@ speakBtn.addEventListener("click", speakCurrentPhrase);
 meaningBtn.addEventListener("click", toggleMeaning);
 nextBtn.addEventListener("click", nextCard);
 
+loadProgress();
 renderCategoryFilters();
 renderCard();

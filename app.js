@@ -6,20 +6,29 @@ const REVIEW_TARGET = 1;
 const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
 
+const CARD_TOTALS = {
+  normal: TOTAL_STEPS,
+  special: Math.floor(TOTAL_STEPS / 3),
+  super: Math.floor(TOTAL_STEPS / 10)
+};
+
 const STORAGE_KEYS = {
   unlockedSteps: "kids-english-steps-unlocked",
   completedSteps: "kids-english-steps-completed",
   phraseProgress: "kids-english-steps-phrase-progress",
-  lastUnlockDate: "kids-english-steps-last-unlock-date"
+  lastUnlockDate: "kids-english-steps-last-unlock-date",
+  cards: "kids-english-cards"
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 const stepsScreenEl = document.getElementById("steps-screen");
+const cardBoxScreenEl = document.getElementById("card-box-screen");
 const reviewScreenEl = document.getElementById("review-screen");
 const learningScreenEl = document.getElementById("learning-screen");
 const stepsGridEl = document.getElementById("steps-grid");
 const stepsMessageEl = document.getElementById("steps-message");
+const cardGridEl = document.getElementById("card-grid");
 
 const reviewStepLabelEl = document.getElementById("review-step-label");
 const reviewStatusEl = document.getElementById("review-status");
@@ -35,6 +44,8 @@ const koreanEl = document.getElementById("korean");
 const successSlotsEl = document.getElementById("success-slots");
 const feedbackTextEl = document.getElementById("feedback-text");
 
+const cardBoxBtn = document.getElementById("card-box-btn");
+const cardBoxBackBtn = document.getElementById("card-box-back-btn");
 const reviewBackBtn = document.getElementById("review-back-btn");
 const backBtn = document.getElementById("back-btn");
 const resetBtn = document.getElementById("reset-btn");
@@ -44,6 +55,12 @@ const reviewStartBtn = document.getElementById("review-start-btn");
 const speakBtn = document.getElementById("speak-btn");
 const recordBtn = document.getElementById("record-btn");
 const meaningBtn = document.getElementById("meaning-btn");
+
+const cardDetailModalEl = document.getElementById("card-detail-modal");
+const cardDetailPreviewEl = document.getElementById("card-detail-preview");
+const cardDetailTitleEl = document.getElementById("card-detail-title");
+const cardDetailTypeEl = document.getElementById("card-detail-type");
+const cardDetailCloseBtn = document.getElementById("card-detail-close-btn");
 
 let currentStep = null;
 let currentPhraseIndex = 0;
@@ -104,7 +121,8 @@ function createInitialState() {
     unlockedSteps: [1],
     completedSteps: [],
     phraseProgress: {},
-    lastUnlockDate: ""
+    lastUnlockDate: "",
+    cards: []
   };
 }
 
@@ -135,6 +153,13 @@ function loadState() {
     .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS);
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
   nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
+  nextState.cards = readStoredArray(STORAGE_KEYS.cards)
+    .filter((card) => card && typeof card === "object")
+    .map((card) => ({
+      id: String(card.id || ""),
+      type: String(card.type || "normal")
+    }))
+    .filter((card) => card.id);
 
   if (!nextState.unlockedSteps.includes(1)) {
     nextState.unlockedSteps.unshift(1);
@@ -157,6 +182,7 @@ function saveState() {
     JSON.stringify(state.phraseProgress)
   );
   window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
+  window.localStorage.setItem(STORAGE_KEYS.cards, JSON.stringify(state.cards));
 }
 
 function getStepPhrases(stepNumber) {
@@ -209,25 +235,8 @@ function normalizeWord(word) {
 
 function getKeywords(text) {
   const stopWords = new Set([
-    "a",
-    "an",
-    "the",
-    "is",
-    "are",
-    "am",
-    "to",
-    "my",
-    "your",
-    "me",
-    "i",
-    "it",
-    "this",
-    "that",
-    "we",
-    "you",
-    "now",
-    "do",
-    "be"
+    "a", "an", "the", "is", "are", "am", "to", "my", "your", "me", "i",
+    "it", "this", "that", "we", "you", "now", "do", "be"
   ]);
 
   return normalizeText(text)
@@ -342,6 +351,77 @@ function isSpeechMatch(spokenText, targetText) {
   return overallScore >= 0.56 && keywordScore >= 0.72;
 }
 
+function addCard(type, id) {
+  if (state.cards.some((card) => card.id === id)) {
+    return;
+  }
+
+  state.cards.push({ id, type });
+}
+
+function giveStepRewards(stepNumber) {
+  addCard("normal", `normal-${stepNumber}`);
+
+  if (stepNumber % 3 === 0) {
+    addCard("special", `special-${stepNumber / 3}`);
+  }
+
+  if (stepNumber % 10 === 0) {
+    addCard("super", `super-${stepNumber / 10}`);
+  }
+}
+
+function getAllCardSlots() {
+  const slots = [];
+
+  Object.entries(CARD_TOTALS).forEach(([type, total]) => {
+    for (let index = 1; index <= total; index += 1) {
+      slots.push({
+        id: `${type}-${index}`,
+        type,
+        label: `${type} card ${index}`,
+        collected: state.cards.some((card) => card.id === `${type}-${index}`)
+      });
+    }
+  });
+
+  return slots;
+}
+
+function getCardClass(type) {
+  return `card-tile ${type}`;
+}
+
+function openCardDetail(card) {
+  cardDetailPreviewEl.className = `card-detail-preview ${card.collected ? card.type : "locked"}`;
+  cardDetailPreviewEl.textContent = card.collected ? card.type.toUpperCase() : "?";
+  cardDetailTitleEl.textContent = card.collected ? card.label : "Locked Card";
+  cardDetailTypeEl.textContent = card.collected ? `Type: ${card.type}` : "Type: locked";
+  cardDetailModalEl.classList.remove("hidden");
+}
+
+function closeCardDetail() {
+  cardDetailModalEl.classList.add("hidden");
+}
+
+function renderCardBox() {
+  cardGridEl.innerHTML = "";
+
+  getAllCardSlots().forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
+    button.innerHTML = `
+      <span class="card-tile-image">${card.collected ? card.type.toUpperCase() : "?"}</span>
+      <span class="card-tile-label">${card.collected ? card.label : "Locked"}</span>
+    `;
+    button.addEventListener("click", () => {
+      openCardDetail(card);
+    });
+    cardGridEl.appendChild(button);
+  });
+}
+
 function updateMeaningVisibility() {
   const phrase = getCurrentPhrase();
   const meaningUnlocked = phrase ? getPhraseProgress(phrase.id) >= PHRASE_TARGET : false;
@@ -362,10 +442,8 @@ function renderSuccessSlots() {
   for (let index = 0; index < PHRASE_TARGET; index += 1) {
     const slot = document.createElement("span");
     const isComplete = index < progress;
-
     slot.className = `success-slot${isComplete ? " filled" : ""}`;
     slot.textContent = isComplete ? "V" : String(index + 1);
-
     successSlotsEl.appendChild(slot);
   }
 }
@@ -435,14 +513,27 @@ function showStepsScreen() {
   currentReviewIndex = 0;
   reviewProgress = [];
   stepsScreenEl.classList.remove("hidden");
+  cardBoxScreenEl.classList.add("hidden");
   reviewScreenEl.classList.add("hidden");
   learningScreenEl.classList.add("hidden");
+}
+
+function showCardBoxScreen() {
+  clearAdvanceTimer();
+  stopRecognition();
+  currentMode = "cards";
+  stepsScreenEl.classList.add("hidden");
+  cardBoxScreenEl.classList.remove("hidden");
+  reviewScreenEl.classList.add("hidden");
+  learningScreenEl.classList.add("hidden");
+  renderCardBox();
 }
 
 function showReviewScreen() {
   setStepsMessage("");
   currentMode = "review";
   stepsScreenEl.classList.add("hidden");
+  cardBoxScreenEl.classList.add("hidden");
   reviewScreenEl.classList.remove("hidden");
   learningScreenEl.classList.add("hidden");
 }
@@ -451,6 +542,7 @@ function showLearningScreen() {
   setStepsMessage("");
   currentMode = "learning";
   stepsScreenEl.classList.add("hidden");
+  cardBoxScreenEl.classList.add("hidden");
   reviewScreenEl.classList.add("hidden");
   learningScreenEl.classList.remove("hidden");
 }
@@ -468,9 +560,7 @@ function getReviewTargets(stepNumber) {
     .filter((targetStep) => targetStep >= 1)
     .map((targetStep) => {
       const phrasesForStep = getStepPhrases(targetStep);
-      return phrasesForStep.length > 0
-        ? { stepNumber: targetStep, phrase: phrasesForStep[0] }
-        : null;
+      return phrasesForStep.length > 0 ? { stepNumber: targetStep, phrase: phrasesForStep[0] } : null;
     })
     .filter(Boolean);
 }
@@ -584,7 +674,6 @@ function renderLearningCard() {
   phraseStatusEl.textContent = `Phrase ${currentPhraseIndex + 1} / ${stepPhrases.length}`;
   englishEl.textContent = phrase.en;
   koreanEl.textContent = phrase.ko;
-
   meaningVisible = false;
   speakBtn.disabled = false;
   renderSuccessSlots();
@@ -603,43 +692,35 @@ function speakPhrase(text) {
   utterance.lang = "en-US";
   utterance.rate = 0.95;
   utterance.pitch = 1;
-
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
 
 function speakCurrentPhrase() {
   const phrase = getCurrentPhrase();
-
-  if (!phrase) {
-    return;
+  if (phrase) {
+    speakPhrase(phrase.en);
   }
-
-  speakPhrase(phrase.en);
 }
 
 function speakCurrentReviewPhrase() {
   const item = getCurrentReviewItem();
-
-  if (!item) {
-    return;
+  if (item) {
+    speakPhrase(item.phrase.en);
   }
-
-  speakPhrase(item.phrase.en);
 }
 
 function toggleMeaning() {
-  if (meaningBtn.disabled) {
-    return;
+  if (!meaningBtn.disabled) {
+    meaningVisible = !meaningVisible;
+    updateMeaningVisibility();
   }
-
-  meaningVisible = !meaningVisible;
-  updateMeaningVisibility();
 }
 
 function completeStep(stepNumber) {
   if (!state.completedSteps.includes(stepNumber)) {
     state.completedSteps.push(stepNumber);
+    giveStepRewards(stepNumber);
   }
 
   const nextStep = stepNumber + 1;
@@ -672,6 +753,7 @@ function moveToNextPhraseOrFinishStep() {
     completeStep(currentStep);
     saveState();
     renderSteps();
+    renderCardBox();
 
     if (nextStep <= TOTAL_STEPS && !canUnlockNextStep) {
       setStepsMessage("Step clear! Come back tomorrow for a new step.");
@@ -689,12 +771,6 @@ function moveToNextPhraseOrFinishStep() {
 
 function advanceReview() {
   currentReviewIndex += 1;
-
-  if (currentReviewIndex >= reviewQueue.length) {
-    renderReviewCard();
-    return;
-  }
-
   renderReviewCard();
 }
 
@@ -711,7 +787,6 @@ function handleSpeechSuccess() {
   }
 
   const phrase = getCurrentPhrase();
-
   if (!phrase) {
     return;
   }
@@ -787,13 +862,18 @@ function resetProgress() {
     return;
   }
 
-  window.localStorage.removeItem(STORAGE_KEYS.unlockedSteps);
-  window.localStorage.removeItem(STORAGE_KEYS.completedSteps);
-  window.localStorage.removeItem(STORAGE_KEYS.phraseProgress);
-  window.localStorage.removeItem(STORAGE_KEYS.lastUnlockDate);
+  Object.values(STORAGE_KEYS).forEach((key) => {
+    window.localStorage.removeItem(key);
+  });
   window.location.reload();
 }
 
+cardBoxBtn.addEventListener("click", () => {
+  showCardBoxScreen();
+});
+cardBoxBackBtn.addEventListener("click", () => {
+  showStepsScreen();
+});
 reviewBackBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
@@ -813,6 +893,13 @@ reviewStartBtn.addEventListener("click", () => {
 speakBtn.addEventListener("click", speakCurrentPhrase);
 recordBtn.addEventListener("click", startRecognition);
 meaningBtn.addEventListener("click", toggleMeaning);
+cardDetailCloseBtn.addEventListener("click", closeCardDetail);
+cardDetailModalEl.addEventListener("click", (event) => {
+  if (event.target === cardDetailModalEl || event.target.classList.contains("modal-backdrop")) {
+    closeCardDetail();
+  }
+});
 
 renderSteps();
+renderCardBox();
 showStepsScreen();

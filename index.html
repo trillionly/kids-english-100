@@ -9,6 +9,7 @@
 <body>
   <div class="app">
     <header class="topbar">
+      <button id="card-box-btn" class="card-box-btn" type="button">Card Box</button>
       <h1>Kids English Steps</h1>
       <p class="subtitle">Speak the sentence and clear each step</p>
       <button id="reset-btn" class="reset-btn" type="button">Reset</button>
@@ -22,6 +23,20 @@
         </div>
         <p id="steps-message" class="steps-message hidden"></p>
         <div id="steps-grid" class="steps-grid"></div>
+      </section>
+
+      <section id="card-box-screen" class="hidden">
+        <div class="learning-header">
+          <button id="card-box-back-btn" class="text-btn" type="button">Back to Steps</button>
+        </div>
+
+        <div class="card-box-panel">
+          <div class="steps-header">
+            <h2>Card Collection</h2>
+            <p>Collect cards by clearing steps.</p>
+          </div>
+          <div id="card-grid" class="card-grid"></div>
+        </div>
       </section>
 
       <section id="review-screen" class="hidden">
@@ -80,6 +95,16 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="card-detail-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <button id="card-detail-close-btn" class="modal-close" type="button">Close</button>
+      <div id="card-detail-preview" class="card-detail-preview"></div>
+      <p id="card-detail-title" class="card-detail-title">Card</p>
+      <p id="card-detail-type" class="card-detail-type">normal</p>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

@@ -30,6 +30,32 @@ body {
   font-size: 16px;
 }
 
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto 20px;
+}
+
+.filter-btn {
+  border: 1px solid #cfd8e6;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: #fff;
+  color: #333;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-btn.active {
+  background: #4f8cff;
+  border-color: #4f8cff;
+  color: #fff;
+}
+
 .card-wrap {
   display: flex;
   justify-content: center;

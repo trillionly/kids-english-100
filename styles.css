@@ -37,12 +37,12 @@ body {
   min-height: 72px;
   border-radius: 22px;
   padding: 10px 14px;
-  background: linear-gradient(180deg, #ffd978 0%, #d89a2b 100%);
-  color: #6a3d08;
+  background: linear-gradient(180deg, #7fd6ff 0%, #3f8cff 100%);
+  color: #123b66;
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 10px 18px rgba(122, 79, 14, 0.22);
+  box-shadow: 0 10px 18px rgba(30, 97, 176, 0.24);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 
@@ -121,6 +121,27 @@ body {
   border-radius: 30px;
   background: linear-gradient(180deg, #ffffff 0%, #fffef8 100%);
   box-shadow: 0 18px 36px rgba(55, 115, 170, 0.18);
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.card-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-section-title {
+  margin: 0;
+  font-size: 22px;
+  color: #355070;
+  font-weight: 900;
 }
 
 .card-grid {
@@ -161,6 +182,14 @@ body {
 
 .card-tile.super .card-tile-image {
   background: linear-gradient(180deg, #b785ff 0%, #7a4dff 100%);
+}
+
+.card-tile.special {
+  box-shadow: 0 0 0 3px rgba(255, 211, 79, 0.28), 0 10px 18px rgba(41, 72, 120, 0.14);
+}
+
+.card-tile.super {
+  box-shadow: 0 0 0 4px rgba(122, 77, 255, 0.32), 0 12px 22px rgba(84, 48, 164, 0.22);
 }
 
 .card-tile.locked .card-tile-image {

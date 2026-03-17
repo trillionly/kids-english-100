@@ -28,7 +28,7 @@ const reviewScreenEl = document.getElementById("review-screen");
 const learningScreenEl = document.getElementById("learning-screen");
 const stepsGridEl = document.getElementById("steps-grid");
 const stepsMessageEl = document.getElementById("steps-message");
-const cardGridEl = document.getElementById("card-grid");
+const cardSectionsEl = document.getElementById("card-sections");
 
 const reviewStepLabelEl = document.getElementById("review-step-label");
 const reviewStatusEl = document.getElementById("review-status");
@@ -430,6 +430,18 @@ function getCardClass(type) {
   return `card-tile ${type}`;
 }
 
+function getCardSectionTitle(type) {
+  if (type === "special") {
+    return "Special Cards";
+  }
+
+  if (type === "super") {
+    return "Super Cards";
+  }
+
+  return "Normal Cards";
+}
+
 function openCardDetail(card) {
   cardDetailPreviewEl.className = `card-detail-preview ${card.collected ? card.type : "locked"}`;
   cardDetailPreviewEl.textContent = card.collected ? card.type.toUpperCase() : "?";
@@ -529,20 +541,37 @@ function closeRewardModal() {
 }
 
 function renderCardBox() {
-  cardGridEl.innerHTML = "";
+  cardSectionsEl.innerHTML = "";
 
-  getAllCardSlots().forEach((card) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
-    button.innerHTML = `
-      <span class="card-tile-image">${card.collected ? card.type.toUpperCase() : "?"}</span>
-      <span class="card-tile-label">${card.collected ? card.id : "Locked"}</span>
-    `;
-    button.addEventListener("click", () => {
-      openCardDetail(card);
-    });
-    cardGridEl.appendChild(button);
+  ["normal", "special", "super"].forEach((type) => {
+    const section = document.createElement("section");
+    const title = document.createElement("h3");
+    const grid = document.createElement("div");
+
+    section.className = "card-section";
+    title.className = "card-section-title";
+    title.textContent = getCardSectionTitle(type);
+    grid.className = `card-grid ${type}-grid`;
+
+    getAllCardSlots()
+      .filter((card) => card.type === type)
+      .forEach((card) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
+        button.innerHTML = `
+          <span class="card-tile-image">${card.collected ? card.type.toUpperCase() : "?"}</span>
+          <span class="card-tile-label">${card.collected ? card.id : "Locked"}</span>
+        `;
+        button.addEventListener("click", () => {
+          openCardDetail(card);
+        });
+        grid.appendChild(button);
+      });
+
+    section.appendChild(title);
+    section.appendChild(grid);
+    cardSectionsEl.appendChild(section);
   });
 }
 

@@ -126,11 +126,12 @@ body {
 }
 
 .card-tile.normal .card-tile-image {
-  background: linear-gradient(180deg, #68a6ff 0%, #3f8cff 100%);
+  background: linear-gradient(180deg, #bfc8d4 0%, #8f9baa 100%);
 }
 
 .card-tile.special .card-tile-image {
-  background: linear-gradient(180deg, #ff9f67 0%, #ff6b3d 100%);
+  background: linear-gradient(180deg, #ffe87d 0%, #ffd34f 100%);
+  color: #5a4200;
 }
 
 .card-tile.super .card-tile-image {
@@ -364,11 +365,12 @@ body {
 }
 
 .card-detail-preview.normal {
-  background: linear-gradient(180deg, #68a6ff 0%, #3f8cff 100%);
+  background: linear-gradient(180deg, #bfc8d4 0%, #8f9baa 100%);
 }
 
 .card-detail-preview.special {
-  background: linear-gradient(180deg, #ff9f67 0%, #ff6b3d 100%);
+  background: linear-gradient(180deg, #ffe87d 0%, #ffd34f 100%);
+  color: #5a4200;
 }
 
 .card-detail-preview.super {

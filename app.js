@@ -7,9 +7,9 @@ const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
 
 const CARD_TOTALS = {
-  normal: TOTAL_STEPS,
-  special: Math.floor(TOTAL_STEPS / 3),
-  super: Math.floor(TOTAL_STEPS / 10)
+  normal: 30,
+  special: 15,
+  super: 5
 };
 
 const STORAGE_KEYS = {
@@ -122,7 +122,7 @@ function createInitialState() {
     completedSteps: [],
     phraseProgress: {},
     lastUnlockDate: "",
-    cards: []
+    collectedCards: []
   };
 }
 
@@ -153,13 +153,16 @@ function loadState() {
     .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS);
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
   nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
-  nextState.cards = readStoredArray(STORAGE_KEYS.cards)
-    .filter((card) => card && typeof card === "object")
-    .map((card) => ({
-      id: String(card.id || ""),
-      type: String(card.type || "normal")
-    }))
-    .filter((card) => card.id);
+  const storedCards = readStoredObject(STORAGE_KEYS.cards);
+  nextState.collectedCards = Array.isArray(storedCards.collectedCards)
+    ? storedCards.collectedCards
+        .filter((card) => card && typeof card === "object")
+        .map((card) => ({
+          id: String(card.id || ""),
+          type: String(card.type || "normal")
+        }))
+        .filter((card) => card.id)
+    : [];
 
   if (!nextState.unlockedSteps.includes(1)) {
     nextState.unlockedSteps.unshift(1);
@@ -182,7 +185,10 @@ function saveState() {
     JSON.stringify(state.phraseProgress)
   );
   window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
-  window.localStorage.setItem(STORAGE_KEYS.cards, JSON.stringify(state.cards));
+  window.localStorage.setItem(
+    STORAGE_KEYS.cards,
+    JSON.stringify({ collectedCards: state.collectedCards })
+  );
 }
 
 function getStepPhrases(stepNumber) {
@@ -351,24 +357,39 @@ function isSpeechMatch(spokenText, targetText) {
   return overallScore >= 0.56 && keywordScore >= 0.72;
 }
 
-function addCard(type, id) {
-  if (state.cards.some((card) => card.id === id)) {
+function formatCardId(type, index) {
+  return `${type}_${String(index).padStart(2, "0")}`;
+}
+
+function getRewardCard(type, stepNumber) {
+  const total = CARD_TOTALS[type];
+  const cardIndex = ((stepNumber % total) + 1);
+  return {
+    id: formatCardId(type, cardIndex),
+    type
+  };
+}
+
+function addCard(card) {
+  if (state.collectedCards.some((item) => item.id === card.id && item.type === card.type)) {
     return;
   }
 
-  state.cards.push({ id, type });
+  state.collectedCards.push(card);
 }
 
 function giveStepRewards(stepNumber) {
-  addCard("normal", `normal-${stepNumber}`);
+  if (stepNumber % 10 === 0) {
+    addCard(getRewardCard("super", stepNumber));
+    return;
+  }
 
   if (stepNumber % 3 === 0) {
-    addCard("special", `special-${stepNumber / 3}`);
+    addCard(getRewardCard("special", stepNumber));
+    return;
   }
 
-  if (stepNumber % 10 === 0) {
-    addCard("super", `super-${stepNumber / 10}`);
-  }
+  addCard(getRewardCard("normal", stepNumber));
 }
 
 function getAllCardSlots() {
@@ -376,11 +397,11 @@ function getAllCardSlots() {
 
   Object.entries(CARD_TOTALS).forEach(([type, total]) => {
     for (let index = 1; index <= total; index += 1) {
+      const id = formatCardId(type, index);
       slots.push({
-        id: `${type}-${index}`,
+        id,
         type,
-        label: `${type} card ${index}`,
-        collected: state.cards.some((card) => card.id === `${type}-${index}`)
+        collected: state.collectedCards.some((card) => card.id === id)
       });
     }
   });
@@ -395,7 +416,7 @@ function getCardClass(type) {
 function openCardDetail(card) {
   cardDetailPreviewEl.className = `card-detail-preview ${card.collected ? card.type : "locked"}`;
   cardDetailPreviewEl.textContent = card.collected ? card.type.toUpperCase() : "?";
-  cardDetailTitleEl.textContent = card.collected ? card.label : "Locked Card";
+  cardDetailTitleEl.textContent = card.collected ? card.id : "Locked Card";
   cardDetailTypeEl.textContent = card.collected ? `Type: ${card.type}` : "Type: locked";
   cardDetailModalEl.classList.remove("hidden");
 }
@@ -413,7 +434,7 @@ function renderCardBox() {
     button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
     button.innerHTML = `
       <span class="card-tile-image">${card.collected ? card.type.toUpperCase() : "?"}</span>
-      <span class="card-tile-label">${card.collected ? card.label : "Locked"}</span>
+      <span class="card-tile-label">${card.collected ? card.id : "Locked"}</span>
     `;
     button.addEventListener("click", () => {
       openCardDetail(card);

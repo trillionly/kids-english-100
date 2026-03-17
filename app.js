@@ -18,7 +18,8 @@ const STORAGE_KEYS = {
   phraseProgress: "kids-english-steps-phrase-progress",
   lastUnlockDate: "kids-english-steps-last-unlock-date",
   cards: "kids-english-cards",
-  testMode: "kids-english-test-mode"
+  testMode: "kids-english-test-mode",
+  cardOrder: "kids-english-card-order"
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -137,7 +138,8 @@ function createInitialState() {
     phraseProgress: {},
     lastUnlockDate: "",
     collectedCards: [],
-    testMode: false
+    testMode: false,
+    cardOrder: {}
   };
 }
 
@@ -169,6 +171,7 @@ function loadState() {
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
   nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
   nextState.testMode = window.localStorage.getItem(STORAGE_KEYS.testMode) === "true";
+  nextState.cardOrder = getStoredCardOrder();
   const storedCards = readStoredObject(STORAGE_KEYS.cards);
   nextState.collectedCards = Array.isArray(storedCards.collectedCards)
     ? storedCards.collectedCards
@@ -202,10 +205,40 @@ function saveState() {
   );
   window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
   window.localStorage.setItem(STORAGE_KEYS.testMode, String(state.testMode));
+  window.localStorage.setItem(STORAGE_KEYS.cardOrder, JSON.stringify(state.cardOrder));
   window.localStorage.setItem(
     STORAGE_KEYS.cards,
     JSON.stringify({ collectedCards: state.collectedCards })
   );
+}
+
+function shuffleArray(items) {
+  const nextItems = [...items];
+
+  for (let index = nextItems.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [nextItems[index], nextItems[randomIndex]] = [nextItems[randomIndex], nextItems[index]];
+  }
+
+  return nextItems;
+}
+
+function getStoredCardOrder() {
+  const storedOrder = readStoredObject(STORAGE_KEYS.cardOrder);
+  const nextOrder = {};
+
+  Object.entries(CARD_TOTALS).forEach(([type, total]) => {
+    const defaultIds = Array.from({ length: total }, (_, index) => formatCardId(type, index + 1));
+    const savedIds = Array.isArray(storedOrder[type]) ? storedOrder[type] : [];
+    const validSavedIds = savedIds.filter((id) => defaultIds.includes(id));
+    const missingIds = defaultIds.filter((id) => !validSavedIds.includes(id));
+
+    nextOrder[type] = validSavedIds.length === defaultIds.length
+      ? validSavedIds
+      : shuffleArray([...validSavedIds, ...missingIds]);
+  });
+
+  return nextOrder;
 }
 
 function getStepPhrases(stepNumber) {
@@ -434,6 +467,19 @@ function getAllCardSlots() {
   return slots;
 }
 
+function getOrderedCardSlotsByType(type) {
+  const cardsById = new Map(
+    getAllCardSlots()
+      .filter((card) => card.type === type)
+      .map((card) => [card.id, card])
+  );
+
+  const orderedIds = Array.isArray(state.cardOrder[type]) ? state.cardOrder[type] : [];
+  return orderedIds
+    .map((id) => cardsById.get(id))
+    .filter(Boolean);
+}
+
 function getCardClass(type) {
   return `card-tile ${type}`;
 }
@@ -620,8 +666,7 @@ function renderCardBox() {
     title.textContent = getCardSectionTitle(type);
     grid.className = `card-grid ${type}-grid`;
 
-    getAllCardSlots()
-      .filter((card) => card.type === type)
+    getOrderedCardSlotsByType(type)
       .forEach((card) => {
         const button = document.createElement("button");
         const isVisible = state.testMode || card.collected;
@@ -1122,6 +1167,7 @@ function resetProgress() {
     return;
   }
 
+  state.cardOrder = {};
   Object.values(STORAGE_KEYS).forEach((key) => {
     window.localStorage.removeItem(key);
   });

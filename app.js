@@ -68,6 +68,8 @@ const cardDetailTypeEl = document.getElementById("card-detail-type");
 const cardDetailCloseBtn = document.getElementById("card-detail-close-btn");
 const rewardModalEl = document.getElementById("reward-modal");
 const rewardCardEl = document.getElementById("reward-card");
+const cardRevealStageEl = document.getElementById("card-reveal-stage");
+const rewardGlowEl = document.getElementById("reward-glow");
 const rewardPreviewEl = document.getElementById("reward-preview");
 const rewardCardIdEl = document.getElementById("reward-card-id");
 const rewardCardTypeEl = document.getElementById("reward-card-type");
@@ -90,6 +92,7 @@ let reviewProgress = [];
 let audioContext = null;
 let hasInitialized = false;
 let rewardEffectTimerId = null;
+let revealStageTimerIds = [];
 
 const state = loadState();
 
@@ -619,10 +622,113 @@ function clearRewardEffects() {
     rewardEffectTimerId = null;
   }
 
+  revealStageTimerIds.forEach((timerId) => {
+    window.clearTimeout(timerId);
+  });
+  revealStageTimerIds = [];
+
   document.body.classList.remove("reward-shake");
+  rewardModalEl.classList.remove(
+    "reward-normal",
+    "reward-special",
+    "reward-super",
+    "glow-start",
+    "shake-start",
+    "burst-start",
+    "reveal-start",
+    "screen-glow",
+    "screen-flash"
+  );
+  rewardCardEl.classList.remove("reward-card-reveal");
+  cardRevealStageEl.classList.remove("reward-card-reveal");
+  rewardGlowEl.classList.remove("active");
   rewardBurstEl.classList.add("hidden");
   rewardBurstEl.classList.remove("active");
+  rewardSparklesEl.classList.add("hidden");
   rewardSparklesEl.classList.remove("super");
+}
+
+function getRevealTimings(cardType) {
+  if (cardType === "super") {
+    return {
+      glowDelay: 0,
+      shakeDelay: 260,
+      burstDelay: 760,
+      revealDelay: 980,
+      cleanupDelay: 1600
+    };
+  }
+
+  if (cardType === "special") {
+    return {
+      glowDelay: 0,
+      shakeDelay: 220,
+      burstDelay: 540,
+      revealDelay: 760,
+      cleanupDelay: 1180
+    };
+  }
+
+  return {
+    glowDelay: 0,
+    shakeDelay: 140,
+    burstDelay: 320,
+    revealDelay: 470,
+    cleanupDelay: 760
+  };
+}
+
+function startRevealAnimation(cardType) {
+  clearRewardEffects();
+
+  const timings = getRevealTimings(cardType);
+  rewardModalEl.classList.add(`reward-${cardType}`);
+  rewardBurstEl.classList.remove("hidden");
+
+  const queueStage = (className, delay, callback) => {
+    const timerId = window.setTimeout(() => {
+      rewardModalEl.classList.add(className);
+      if (callback) {
+        callback();
+      }
+    }, delay);
+    revealStageTimerIds.push(timerId);
+  };
+
+  queueStage("glow-start", timings.glowDelay, () => {
+    rewardGlowEl.classList.add("active");
+    if (cardType !== "normal") {
+      rewardSparklesEl.classList.remove("hidden");
+      rewardSparklesEl.classList.toggle("super", cardType === "super");
+    }
+    if (cardType === "special") {
+      rewardModalEl.classList.add("screen-glow");
+    }
+    if (cardType === "super") {
+      rewardModalEl.classList.add("screen-flash");
+    }
+  });
+
+  queueStage("shake-start", timings.shakeDelay, () => {
+    if (cardType === "super") {
+      document.body.classList.add("reward-shake");
+    }
+  });
+
+  queueStage("burst-start", timings.burstDelay, () => {
+    rewardBurstEl.classList.add("active");
+  });
+
+  queueStage("reveal-start", timings.revealDelay, () => {
+    rewardCardEl.classList.add("reward-card-reveal");
+    cardRevealStageEl.classList.add("reward-card-reveal");
+  });
+
+  const cleanupTimerId = window.setTimeout(() => {
+    document.body.classList.remove("reward-shake");
+    rewardModalEl.classList.remove("screen-glow", "screen-flash");
+  }, timings.cleanupDelay);
+  revealStageTimerIds.push(cleanupTimerId);
 }
 
 function openRewardModal(card) {
@@ -630,27 +736,14 @@ function openRewardModal(card) {
     return;
   }
 
-  clearRewardEffects();
   rewardCardEl.className = `modal-card reward-card ${card.type}`;
   rewardPreviewEl.className = `card-detail-preview ${card.type}`;
   rewardPreviewEl.innerHTML = `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`;
   rewardCardIdEl.textContent = card.id;
   rewardCardTypeEl.textContent = `Type: ${card.type}`;
-  rewardSparklesEl.classList.toggle("hidden", card.type === "normal");
-  rewardSparklesEl.classList.toggle("super", card.type === "super");
-  rewardBurstEl.classList.toggle("hidden", card.type !== "super");
   rewardModalEl.classList.remove("hidden");
   rewardModalEl.hidden = false;
-
-  if (card.type === "super") {
-    document.body.classList.add("reward-shake");
-    rewardBurstEl.classList.add("active");
-    rewardEffectTimerId = window.setTimeout(() => {
-      document.body.classList.remove("reward-shake");
-      rewardBurstEl.classList.remove("active");
-    }, 650);
-  }
-
+  startRevealAnimation(card.type);
   playRewardSound(card.type);
 }
 

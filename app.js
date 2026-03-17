@@ -432,6 +432,11 @@ function getCardClass(type) {
   return `card-tile ${type}`;
 }
 
+function getCardImagePath(card) {
+  const extension = card.type === "super" ? "gif" : "png";
+  return `/cards/${card.type}/${card.id}.${extension}`;
+}
+
 function getCardSectionTitle(type) {
   if (type === "special") {
     return "Special Cards";
@@ -446,7 +451,9 @@ function getCardSectionTitle(type) {
 
 function openCardDetail(card) {
   cardDetailPreviewEl.className = `card-detail-preview ${card.collected ? card.type : "locked"}`;
-  cardDetailPreviewEl.textContent = card.collected ? card.type.toUpperCase() : "?";
+  cardDetailPreviewEl.innerHTML = card.collected
+    ? `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`
+    : "?";
   cardDetailTitleEl.textContent = card.collected ? card.id : "Locked Card";
   cardDetailTypeEl.textContent = card.collected ? `Type: ${card.type}` : "Type: locked";
   cardDetailModalEl.classList.remove("hidden");
@@ -454,6 +461,7 @@ function openCardDetail(card) {
 
 function closeCardDetail() {
   cardDetailModalEl.classList.add("hidden");
+  cardDetailPreviewEl.innerHTML = "";
 }
 
 function getAudioContext() {
@@ -562,7 +570,7 @@ function openRewardModal(card) {
   clearRewardEffects();
   rewardCardEl.className = `modal-card reward-card ${card.type}`;
   rewardPreviewEl.className = `card-detail-preview ${card.type}`;
-  rewardPreviewEl.textContent = card.type.toUpperCase();
+  rewardPreviewEl.innerHTML = `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`;
   rewardCardIdEl.textContent = card.id;
   rewardCardTypeEl.textContent = `Type: ${card.type}`;
   rewardSparklesEl.classList.toggle("hidden", card.type === "normal");
@@ -589,6 +597,7 @@ function closeRewardModal() {
   rewardModalEl.hidden = true;
   rewardCardEl.className = "modal-card reward-card";
   rewardPreviewEl.className = "card-detail-preview";
+  rewardPreviewEl.innerHTML = "";
   rewardSparklesEl.classList.add("hidden");
 }
 
@@ -612,7 +621,11 @@ function renderCardBox() {
         button.type = "button";
         button.className = `${getCardClass(card.type)}${card.collected ? "" : " locked"}`;
         button.innerHTML = `
-          <span class="card-tile-image">${card.collected ? card.type.toUpperCase() : "?"}</span>
+          <span class="card-tile-image">${
+            card.collected
+              ? `<img class="card-image-media" src="${getCardImagePath(card)}" alt="${card.id}" />`
+              : "?"
+          }</span>
           <span class="card-tile-label">${card.collected ? card.id : "Locked"}</span>
         `;
         button.addEventListener("click", () => {

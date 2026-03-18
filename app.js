@@ -1,7 +1,7 @@
 import { phrases } from "./data/phrases.js";
 
 const PHRASES_PER_STEP = 3;
-const PHRASE_TARGET = 5;
+const PHRASE_TARGET = 7;
 const REVIEW_TARGET = 3;
 const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
@@ -83,6 +83,7 @@ let meaningVisible = false;
 let advanceTimerId = null;
 let recognition = null;
 let isListening = false;
+let hasListened = false;
 
 let currentMode = "learning";
 let pendingStep = null;
@@ -257,6 +258,16 @@ function getPhraseProgress(phraseId) {
 
 function setPhraseProgress(phraseId, value) {
   state.phraseProgress[phraseId] = Math.max(0, Math.min(PHRASE_TARGET, value));
+}
+
+function resetListenGate() {
+  hasListened = false;
+  updateRecordButtons();
+}
+
+function unlockMicAfterListen() {
+  hasListened = true;
+  updateRecordButtons();
 }
 
 function isStepUnlocked(stepNumber) {
@@ -640,6 +651,7 @@ function clearRewardEffects() {
     "screen-flash"
   );
   rewardCardEl.classList.remove("reward-card-reveal");
+  rewardCardEl.classList.remove("reveal-normal", "reveal-special", "reveal-super");
   cardRevealStageEl.classList.remove("reward-card-reveal");
   rewardGlowEl.classList.remove("active");
   rewardBurstEl.classList.add("hidden");
@@ -652,29 +664,29 @@ function getRevealTimings(cardType) {
   if (cardType === "super") {
     return {
       glowDelay: 0,
-      shakeDelay: 260,
-      burstDelay: 760,
-      revealDelay: 980,
-      cleanupDelay: 1600
+      shakeDelay: 110,
+      burstDelay: 180,
+      revealDelay: 30,
+      cleanupDelay: 620
     };
   }
 
   if (cardType === "special") {
     return {
       glowDelay: 0,
-      shakeDelay: 220,
-      burstDelay: 540,
-      revealDelay: 760,
-      cleanupDelay: 1180
+      shakeDelay: null,
+      burstDelay: 160,
+      revealDelay: 24,
+      cleanupDelay: 560
     };
   }
 
   return {
     glowDelay: 0,
-    shakeDelay: 140,
-    burstDelay: 320,
-    revealDelay: 470,
-    cleanupDelay: 760
+    shakeDelay: null,
+    burstDelay: 140,
+    revealDelay: 20,
+    cleanupDelay: 480
   };
 }
 
@@ -709,11 +721,13 @@ function startRevealAnimation(cardType) {
     }
   });
 
-  queueStage("shake-start", timings.shakeDelay, () => {
-    if (cardType === "super") {
-      document.body.classList.add("reward-shake");
-    }
-  });
+  if (typeof timings.shakeDelay === "number") {
+    queueStage("shake-start", timings.shakeDelay, () => {
+      if (cardType === "super") {
+        document.body.classList.add("reward-shake");
+      }
+    });
+  }
 
   queueStage("burst-start", timings.burstDelay, () => {
     rewardBurstEl.classList.add("active");
@@ -721,6 +735,7 @@ function startRevealAnimation(cardType) {
 
   queueStage("reveal-start", timings.revealDelay, () => {
     rewardCardEl.classList.add("reward-card-reveal");
+    rewardCardEl.classList.add(`reveal-${cardType}`);
     cardRevealStageEl.classList.add("reward-card-reveal");
   });
 
@@ -865,16 +880,24 @@ function updateTestModeUI() {
 function updateRecordButtons() {
   if (!SpeechRecognition) {
     recordBtn.disabled = true;
-    recordBtn.textContent = "🎤 Mic Unavailable";
+    recordBtn.textContent = "Mic Unavailable";
     reviewRecordBtn.disabled = true;
-    reviewRecordBtn.textContent = "🎤 Mic Unavailable";
+    reviewRecordBtn.textContent = "Mic Unavailable";
     return;
   }
 
-  recordBtn.disabled = false;
-  reviewRecordBtn.disabled = false;
-  recordBtn.textContent = isListening ? "🎤 Listening..." : "🎤 Start Mic";
-  reviewRecordBtn.textContent = isListening ? "🎤 Listening..." : "🎤 Start Mic";
+  const micLocked = !hasListened;
+
+  recordBtn.disabled = micLocked || isListening;
+  reviewRecordBtn.disabled = micLocked || isListening;
+  recordBtn.classList.toggle("locked", micLocked);
+  reviewRecordBtn.classList.toggle("locked", micLocked);
+  recordBtn.textContent = isListening ? "Listening..." : micLocked ? "Listen First" : "Start Mic";
+  reviewRecordBtn.textContent = isListening
+    ? "Listening..."
+    : micLocked
+      ? "Listen First"
+      : "Start Mic";
 }
 
 function stopRecognition() {
@@ -902,6 +925,7 @@ function showStepsScreen() {
   reviewQueue = [];
   currentReviewIndex = 0;
   reviewProgress = [];
+  resetListenGate();
   stepsScreenEl.classList.remove("hidden");
   cardBoxScreenEl.classList.add("hidden");
   reviewScreenEl.classList.add("hidden");
@@ -912,6 +936,7 @@ function showCardBoxScreen() {
   clearAdvanceTimer();
   stopRecognition();
   currentMode = "cards";
+  resetListenGate();
   stepsScreenEl.classList.add("hidden");
   cardBoxScreenEl.classList.remove("hidden");
   reviewScreenEl.classList.add("hidden");
@@ -1044,12 +1069,13 @@ function renderReviewCard() {
     return;
   }
 
+  resetListenGate();
   reviewStepLabelEl.textContent = `Review Step ${item.stepNumber}`;
   reviewStatusEl.textContent = `Item ${currentReviewIndex + 1} / ${reviewQueue.length}`;
   reviewEnglishEl.textContent = item.phrase.en;
   reviewKoreanEl.textContent = item.phrase.ko;
   renderReviewSlots();
-  setReviewFeedback("Press the mic and say the sentence three times.", "");
+  setReviewFeedback(`Listen first, then say the sentence ${REVIEW_TARGET} times.`, "");
   reviewRecordBtn.classList.remove("hidden");
   reviewListenBtn.classList.remove("hidden");
   reviewStartBtn.classList.add("hidden");
@@ -1075,6 +1101,7 @@ function renderLearningCard() {
     return;
   }
 
+  resetListenGate();
   stepLabelEl.textContent = `Step ${currentStep}`;
   phraseStatusEl.textContent = `Phrase ${currentPhraseIndex + 1} / ${stepPhrases.length}`;
   englishEl.textContent = phrase.en;
@@ -1089,7 +1116,7 @@ function renderLearningCard() {
   if (!SpeechRecognition) {
     setFeedback("This browser does not support microphone speech practice.", "error");
   } else {
-    setFeedback("Press the mic and say the sentence.", "");
+    setFeedback("Listen first to unlock the mic.", "");
   }
 }
 
@@ -1105,6 +1132,8 @@ function speakPhrase(text) {
 function speakCurrentPhrase() {
   const phrase = getCurrentPhrase();
   if (phrase) {
+    unlockMicAfterListen();
+    setFeedback("Great! Now tap the mic and say the sentence.", "");
     speakPhrase(phrase.en);
   }
 }
@@ -1112,6 +1141,8 @@ function speakCurrentPhrase() {
 function speakCurrentReviewPhrase() {
   const item = getCurrentReviewItem();
   if (item) {
+    unlockMicAfterListen();
+    setReviewFeedback(`Great! Now tap the mic and say it ${REVIEW_TARGET} times.`, "");
     speakPhrase(item.phrase.en);
   }
 }
@@ -1257,6 +1288,16 @@ function startRecognition() {
   }
 
   clearAdvanceTimer();
+
+  if (!hasListened) {
+    if (currentMode === "review") {
+      setReviewFeedback("Listen first to unlock the mic.", "error");
+    } else {
+      setFeedback("Listen first to unlock the mic.", "error");
+    }
+    updateRecordButtons();
+    return;
+  }
 
   if (currentMode === "learning") {
     meaningVisible = false;

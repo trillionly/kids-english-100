@@ -80,6 +80,7 @@ const rewardCloseBtn = document.getElementById("reward-close-btn");
 let currentStep = null;
 let currentPhraseIndex = 0;
 let meaningVisible = false;
+let isReplayingCompletedStep = false;
 let advanceTimerId = null;
 let recognition = null;
 let isListening = false;
@@ -508,19 +509,19 @@ function isSpeechMatch(spokenText, targetText) {
   const targetKeywords = getKeywords(targetText);
   const matchedKeywords = keywordScore * targetKeywords.length;
 
-  if (overallScore >= 0.68) {
+  if (overallScore >= 0.7) {
     return true;
   }
 
-  if (targetKeywords.length <= 2 && keywordScore >= 0.5) {
+  if (targetKeywords.length <= 2 && keywordScore >= 0.58) {
     return true;
   }
 
-  if (targetKeywords.length >= 3 && matchedKeywords >= 2 && keywordScore >= 0.58) {
+  if (targetKeywords.length >= 3 && matchedKeywords >= 2 && keywordScore >= 0.62) {
     return true;
   }
 
-  return overallScore >= 0.56 && keywordScore >= 0.72;
+  return overallScore >= 0.6 && keywordScore >= 0.74;
 }
 
 function formatCardId(type, index) {
@@ -1096,7 +1097,10 @@ function getStepRewardType(stepNumber) {
 function startSelectedStep(step) {
   clearAdvanceTimer();
   currentStep = step;
-  currentPhraseIndex = findFirstIncompletePhraseIndex(getStepPhrases(step));
+  isReplayingCompletedStep = isStepCompleted(step);
+  currentPhraseIndex = isReplayingCompletedStep
+    ? 0
+    : findFirstIncompletePhraseIndex(getStepPhrases(step));
   renderLearningCard();
   showLearningScreen();
 }
@@ -1261,13 +1265,14 @@ function completeStep(stepNumber) {
 
 function moveToNextPhraseOrFinishStep() {
   const stepPhrases = getStepPhrases(currentStep);
-  const nextPhraseIndex = stepPhrases.findIndex(
-    (item) => getPhraseProgress(item.id) < PHRASE_TARGET
-  );
+  const nextPhraseIndex = isReplayingCompletedStep
+    ? currentPhraseIndex + 1
+    : stepPhrases.findIndex((item) => getPhraseProgress(item.id) < PHRASE_TARGET);
 
-  if (nextPhraseIndex === -1) {
+  if (nextPhraseIndex === -1 || nextPhraseIndex >= stepPhrases.length) {
     const nextStep = currentStep + 1;
     const awardedCard = completeStep(currentStep);
+    isReplayingCompletedStep = false;
     saveState();
     renderSteps();
     renderCardBox();
@@ -1293,7 +1298,11 @@ function moveToNextPhraseOrFinishStep() {
 function moveForward() {
   const phrase = getCurrentPhrase();
 
-  if (!phrase || getPhraseProgress(phrase.id) < PHRASE_TARGET) {
+  if (!phrase) {
+    return;
+  }
+
+  if (!isReplayingCompletedStep && getPhraseProgress(phrase.id) < PHRASE_TARGET) {
     return;
   }
 

@@ -217,6 +217,107 @@ function saveState() {
   );
 }
 
+function getKstDateString(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateString(dateString) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateString || ""));
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day)
+  };
+}
+
+function getDaysBetweenDateStrings(fromDateString, toDateString) {
+  const fromParts = parseDateString(fromDateString);
+  const toParts = parseDateString(toDateString);
+
+  if (!fromParts || !toParts) {
+    return 0;
+  }
+
+  const fromTime = Date.UTC(fromParts.year, fromParts.month - 1, fromParts.day);
+  const toTime = Date.UTC(toParts.year, toParts.month - 1, toParts.day);
+  return Math.floor((toTime - fromTime) / 86400000);
+}
+
+function normalizeUnlockedSteps() {
+  state.unlockedSteps = [...new Set(
+    state.unlockedSteps
+      .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS)
+  )].sort((a, b) => a - b);
+
+  if (!state.unlockedSteps.includes(1)) {
+    state.unlockedSteps.unshift(1);
+  }
+}
+
+function getHighestUnlockedStep() {
+  normalizeUnlockedSteps();
+  return state.unlockedSteps[state.unlockedSteps.length - 1] || 1;
+}
+
+function unlockNextAvailableStep() {
+  normalizeUnlockedSteps();
+
+  for (let step = 1; step <= TOTAL_STEPS; step += 1) {
+    if (!state.unlockedSteps.includes(step)) {
+      state.unlockedSteps.push(step);
+      state.unlockedSteps.sort((a, b) => a - b);
+      return step;
+    }
+  }
+
+  return null;
+}
+
+function applyMissedDailyUnlocks() {
+  normalizeUnlockedSteps();
+
+  const todayKst = getKstDateString();
+  const savedDate = parseDateString(state.lastUnlockDate) ? state.lastUnlockDate : "";
+
+  if (!savedDate) {
+    state.lastUnlockDate = todayKst;
+    return;
+  }
+
+  const missedDays = getDaysBetweenDateStrings(savedDate, todayKst);
+
+  if (missedDays <= 0) {
+    if (savedDate !== todayKst) {
+      state.lastUnlockDate = todayKst;
+    }
+    return;
+  }
+
+  for (let day = 0; day < missedDays; day += 1) {
+    if (!unlockNextAvailableStep()) {
+      break;
+    }
+  }
+
+  state.lastUnlockDate = todayKst;
+}
+
 function shuffleArray(items) {
   const nextItems = [...items];
 
@@ -1155,21 +1256,7 @@ function toggleMeaning() {
 }
 
 function completeStep(stepNumber) {
-  const awardedCard = awardCardForCompletedStep(stepNumber);
-
-  const nextStep = stepNumber + 1;
-  const today = new Date().toISOString().slice(0, 10);
-
-  if (
-    nextStep <= TOTAL_STEPS &&
-    !state.unlockedSteps.includes(nextStep) &&
-    state.lastUnlockDate !== today
-  ) {
-    state.unlockedSteps.push(nextStep);
-    state.lastUnlockDate = today;
-  }
-
-  return awardedCard;
+  return awardCardForCompletedStep(stepNumber);
 }
 
 function moveToNextPhraseOrFinishStep() {
@@ -1180,18 +1267,12 @@ function moveToNextPhraseOrFinishStep() {
 
   if (nextPhraseIndex === -1) {
     const nextStep = currentStep + 1;
-    const today = new Date().toISOString().slice(0, 10);
-    const canUnlockNextStep =
-      nextStep <= TOTAL_STEPS &&
-      !state.unlockedSteps.includes(nextStep) &&
-      state.lastUnlockDate !== today;
-
     const awardedCard = completeStep(currentStep);
     saveState();
     renderSteps();
     renderCardBox();
 
-    if (nextStep <= TOTAL_STEPS && !canUnlockNextStep) {
+    if (nextStep <= TOTAL_STEPS && !isStepUnlocked(nextStep)) {
       setStepsMessage("Step clear! Come back tomorrow for a new step.");
     } else {
       setStepsMessage("");
@@ -1393,6 +1474,8 @@ rewardModalEl.addEventListener("click", (event) => {
   }
 });
 
+applyMissedDailyUnlocks();
+saveState();
 renderSteps();
 showStepsScreen();
 hasInitialized = true;

@@ -287,8 +287,8 @@ body.reward-shake {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #49a7ff;
-  box-shadow: 0 0 0 4px rgba(73, 167, 255, 0.16), 0 0 12px rgba(73, 167, 255, 0.32);
+  background: #59f58f;
+  box-shadow: 0 0 0 4px rgba(89, 245, 143, 0.18), 0 0 12px rgba(89, 245, 143, 0.34);
   flex-shrink: 0;
 }
 

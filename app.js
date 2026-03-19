@@ -1161,7 +1161,7 @@ function invalidateReviewFlow() {
 function updateTestModeUI() {
   testModeBannerEl.classList.toggle("hidden", !state.testMode);
   testModeBtn.classList.toggle("active", state.testMode);
-  testModeBtn.textContent = state.testMode ? "Test On" : "Test";
+  testModeBtn.textContent = state.testMode ? "Test Off" : "Test On";
 }
 
 function updateRecordButtons() {
@@ -1289,7 +1289,7 @@ function startSelectedStep(step) {
 }
 
 function beginStep(step) {
-  if (isStepCompleted(step) || step === 1) {
+  if (step === 1) {
     startSelectedStep(step);
     return;
   }
@@ -1666,7 +1666,7 @@ function resetProgress() {
   window.location.reload();
 }
 
-function enableTestMode() {
+function toggleTestMode() {
   const password = window.prompt("Enter test mode password:");
 
   if (password === null) {
@@ -1678,11 +1678,16 @@ function enableTestMode() {
     return;
   }
 
-  state.testMode = true;
+  state.testMode = !state.testMode;
   saveState();
   renderSteps();
   renderCardBox();
-  setStepsMessage("Test mode is active.");
+
+  if (state.testMode) {
+    setStepsMessage("Test mode is active.");
+  } else {
+    setStepsMessage("Test mode is off.");
+  }
 }
 
 cardBoxBtn.addEventListener("click", () => {
@@ -1699,7 +1704,7 @@ backBtn.addEventListener("click", () => {
   renderSteps();
   showStepsScreen();
 });
-testModeBtn.addEventListener("click", enableTestMode);
+testModeBtn.addEventListener("click", toggleTestMode);
 resetBtn.addEventListener("click", resetProgress);
 reviewListenBtn.addEventListener("click", speakCurrentReviewPhrase);
 reviewRecordBtn.addEventListener("click", startRecognition);

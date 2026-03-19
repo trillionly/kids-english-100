@@ -478,11 +478,15 @@ function buildReviewQueue(targetStepNumber) {
   }
 
   const recallCandidate = getRecallCandidate(selectedEntries);
-
-  return selectedEntries.map((entry) => ({
+  const reviewItems = selectedEntries.map((entry) => ({
     ...entry,
     mode: recallCandidate && recallCandidate.phrase.id === entry.phrase.id ? "recall" : "normal"
   }));
+
+  const recallItem = reviewItems.find((item) => item.mode === "recall");
+  const normalItems = reviewItems.filter((item) => item.mode !== "recall");
+
+  return recallItem ? [...normalItems, recallItem] : reviewItems;
 }
 
 function schedulePhraseForNextReview(phraseId, nextStage) {

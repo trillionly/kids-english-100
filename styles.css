@@ -977,10 +977,15 @@ body.reward-shake {
 }
 
 .next-btn {
+  grid-column: 1 / -1;
   border-color: rgba(92, 244, 179, 0.4);
   background: linear-gradient(180deg, #1fe29b 0%, #109c65 100%);
   color: #072b18;
   box-shadow: 0 0 18px rgba(35, 231, 161, 0.18), 0 12px 20px rgba(3, 10, 22, 0.34);
+  padding: 9px 18px;
+  min-height: 0;
+  font-size: 18px;
+  border-radius: 18px;
 }
 
 @keyframes reward-glow-normal {

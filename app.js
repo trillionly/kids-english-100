@@ -5,6 +5,9 @@ const PHRASE_TARGET = 7;
 const REVIEW_TARGET = 3;
 const TOTAL_STEPS = 50;
 const AUTO_ADVANCE_DELAY = 1200;
+const REVIEW_INTERVAL_DAYS = [1, 3, 7, 14, 30];
+const REVIEW_SESSION_LIMIT = 3;
+const REVIEW_FAILURE_THRESHOLD = 2;
 
 const CARD_TOTALS = {
   normal: 30,
@@ -16,6 +19,7 @@ const STORAGE_KEYS = {
   unlockedSteps: "kids-english-steps-unlocked",
   completedSteps: "kids-english-steps-completed",
   phraseProgress: "kids-english-steps-phrase-progress",
+  phraseReviews: "kids-english-phrase-reviews",
   lastUnlockDate: "kids-english-steps-last-unlock-date",
   cards: "kids-english-cards",
   testMode: "kids-english-test-mode",
@@ -91,10 +95,12 @@ let pendingStep = null;
 let reviewQueue = [];
 let currentReviewIndex = 0;
 let reviewProgress = [];
+let reviewFailures = [];
 let audioContext = null;
 let hasInitialized = false;
 let rewardEffectTimerId = null;
 let revealStageTimerIds = [];
+let reviewFlowToken = 0;
 
 const state = loadState();
 
@@ -142,6 +148,7 @@ function createInitialState() {
     unlockedSteps: [1],
     completedSteps: [],
     phraseProgress: {},
+    phraseReviews: {},
     lastUnlockDate: "",
     collectedCards: [],
     testMode: false,
@@ -175,6 +182,7 @@ function loadState() {
   nextState.completedSteps = readStoredArray(STORAGE_KEYS.completedSteps)
     .filter((step) => Number.isInteger(step) && step >= 1 && step <= TOTAL_STEPS);
   nextState.phraseProgress = readStoredObject(STORAGE_KEYS.phraseProgress);
+  nextState.phraseReviews = readStoredObject(STORAGE_KEYS.phraseReviews);
   nextState.lastUnlockDate = window.localStorage.getItem(STORAGE_KEYS.lastUnlockDate) || "";
   nextState.testMode = window.localStorage.getItem(STORAGE_KEYS.testMode) === "true";
   nextState.cardOrder = getStoredCardOrder();
@@ -208,6 +216,10 @@ function saveState() {
   window.localStorage.setItem(
     STORAGE_KEYS.phraseProgress,
     JSON.stringify(state.phraseProgress)
+  );
+  window.localStorage.setItem(
+    STORAGE_KEYS.phraseReviews,
+    JSON.stringify(state.phraseReviews)
   );
   window.localStorage.setItem(STORAGE_KEYS.lastUnlockDate, state.lastUnlockDate);
   window.localStorage.setItem(STORAGE_KEYS.testMode, String(state.testMode));
@@ -317,6 +329,175 @@ function applyMissedDailyUnlocks() {
   }
 
   state.lastUnlockDate = todayKst;
+}
+
+function addDaysToDateString(dateString, days) {
+  const parts = parseDateString(dateString);
+  if (!parts) {
+    return getKstDateString();
+  }
+
+  const nextDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return getKstDateString(nextDate);
+}
+
+function normalizeReviewRecord(record, todayKst = getKstDateString()) {
+  const stage = Number.isInteger(record?.stage)
+    ? Math.max(0, Math.min(REVIEW_INTERVAL_DAYS.length - 1, record.stage))
+    : 0;
+  const nextReviewDate = parseDateString(record?.nextReviewDate)
+    ? record.nextReviewDate
+    : todayKst;
+
+  return {
+    stage,
+    nextReviewDate,
+    lastReviewedDate: parseDateString(record?.lastReviewedDate) ? record.lastReviewedDate : "",
+    lastLearningDate: parseDateString(record?.lastLearningDate) ? record.lastLearningDate : ""
+  };
+}
+
+function getPhraseReviewRecord(phraseId) {
+  return normalizeReviewRecord(state.phraseReviews[phraseId]);
+}
+
+function setPhraseReviewRecord(phraseId, record) {
+  state.phraseReviews[phraseId] = normalizeReviewRecord(record);
+}
+
+function ensurePhraseReviewRecord(phraseId, options = {}) {
+  const { dueToday = false } = options;
+  const todayKst = getKstDateString();
+  const existingRecord = state.phraseReviews[phraseId];
+
+  if (existingRecord) {
+    const normalizedRecord = normalizeReviewRecord(existingRecord, todayKst);
+    state.phraseReviews[phraseId] = normalizedRecord;
+    return normalizedRecord;
+  }
+
+  const initialRecord = {
+    stage: 0,
+    nextReviewDate: dueToday ? todayKst : addDaysToDateString(todayKst, REVIEW_INTERVAL_DAYS[0]),
+    lastReviewedDate: "",
+    lastLearningDate: todayKst
+  };
+  setPhraseReviewRecord(phraseId, initialRecord);
+  return state.phraseReviews[phraseId];
+}
+
+function syncPhraseReviewsWithLearnedProgress() {
+  phrases.forEach((phrase) => {
+    if (getPhraseProgress(phrase.id) >= PHRASE_TARGET) {
+      ensurePhraseReviewRecord(phrase.id, { dueToday: true });
+    }
+  });
+}
+
+function getPhraseStepNumber(phraseId) {
+  const phraseIndex = phrases.findIndex((phrase) => phrase.id === phraseId);
+  if (phraseIndex === -1) {
+    return null;
+  }
+
+  return Math.floor(phraseIndex / PHRASES_PER_STEP) + 1;
+}
+
+function isPhraseDueForReview(phraseId, todayKst = getKstDateString()) {
+  const record = ensurePhraseReviewRecord(phraseId, { dueToday: true });
+  return getDaysBetweenDateStrings(record.nextReviewDate, todayKst) >= 0;
+}
+
+function getEligibleReviewEntries() {
+  const todayKst = getKstDateString();
+
+  return phrases
+    .filter((phrase) => getPhraseProgress(phrase.id) >= PHRASE_TARGET)
+    .map((phrase) => {
+      const review = ensurePhraseReviewRecord(phrase.id, { dueToday: true });
+      const overdueDays = Math.max(0, getDaysBetweenDateStrings(review.nextReviewDate, todayKst));
+
+      return {
+        phrase,
+        review,
+        overdueDays,
+        stepNumber: getPhraseStepNumber(phrase.id)
+      };
+    })
+    .filter((entry) => isPhraseDueForReview(entry.phrase.id, todayKst))
+    .sort((left, right) => {
+      if (right.overdueDays !== left.overdueDays) {
+        return right.overdueDays - left.overdueDays;
+      }
+
+      if (right.review.stage !== left.review.stage) {
+        return right.review.stage - left.review.stage;
+      }
+
+      return left.review.nextReviewDate.localeCompare(right.review.nextReviewDate);
+    });
+}
+
+function getRecallCandidate(entries) {
+  const rankedEntries = [...entries].sort((left, right) => {
+    if (right.review.stage !== left.review.stage) {
+      return right.review.stage - left.review.stage;
+    }
+
+    return getPhraseProgress(right.phrase.id) - getPhraseProgress(left.phrase.id);
+  });
+
+  return rankedEntries.find((entry) => entry.review.stage >= 1) || rankedEntries[0] || null;
+}
+
+function buildReviewQueue() {
+  const selectedEntries = getEligibleReviewEntries().slice(0, REVIEW_SESSION_LIMIT);
+
+  if (selectedEntries.length === 0) {
+    return [];
+  }
+
+  const recallCandidate = getRecallCandidate(selectedEntries);
+
+  return selectedEntries.map((entry) => ({
+    ...entry,
+    mode: recallCandidate && recallCandidate.phrase.id === entry.phrase.id ? "recall" : "normal"
+  }));
+}
+
+function schedulePhraseForNextReview(phraseId, nextStage) {
+  const todayKst = getKstDateString();
+  const safeStage = Math.max(0, Math.min(REVIEW_INTERVAL_DAYS.length - 1, nextStage));
+
+  setPhraseReviewRecord(phraseId, {
+    ...getPhraseReviewRecord(phraseId),
+    stage: safeStage,
+    nextReviewDate: addDaysToDateString(todayKst, REVIEW_INTERVAL_DAYS[safeStage]),
+    lastReviewedDate: todayKst
+  });
+}
+
+function initializePhraseReviewSchedule(phraseId) {
+  const existingRecord = state.phraseReviews[phraseId];
+  if (existingRecord) {
+    return;
+  }
+
+  ensurePhraseReviewRecord(phraseId, { dueToday: false });
+}
+
+function handleCompletedReviewItem(item, failureCount) {
+  const currentRecord = getPhraseReviewRecord(item.phrase.id);
+
+  if (failureCount >= REVIEW_FAILURE_THRESHOLD) {
+    schedulePhraseForNextReview(item.phrase.id, Math.max(0, currentRecord.stage - 1));
+    return;
+  }
+
+  schedulePhraseForNextReview(
+    item.phrase.id,
+    Math.min(REVIEW_INTERVAL_DAYS.length - 1, currentRecord.stage + 1)
+  );
 }
 
 function shuffleArray(items) {
@@ -973,6 +1154,10 @@ function setStepsMessage(message) {
   stepsMessageEl.classList.toggle("hidden", !message);
 }
 
+function invalidateReviewFlow() {
+  reviewFlowToken += 1;
+}
+
 function updateTestModeUI() {
   testModeBannerEl.classList.toggle("hidden", !state.testMode);
   testModeBtn.classList.toggle("active", state.testMode);
@@ -1019,14 +1204,17 @@ function showStepsScreen() {
   clearAdvanceTimer();
   stopRecognition();
   closeRewardModal();
+  invalidateReviewFlow();
   currentMode = "steps";
   currentStep = null;
   currentPhraseIndex = 0;
   meaningVisible = false;
+  isReplayingCompletedStep = false;
   pendingStep = null;
   reviewQueue = [];
   currentReviewIndex = 0;
   reviewProgress = [];
+  reviewFailures = [];
   resetListenGate();
   stepsScreenEl.classList.remove("hidden");
   cardBoxScreenEl.classList.add("hidden");
@@ -1037,6 +1225,7 @@ function showStepsScreen() {
 function showCardBoxScreen() {
   clearAdvanceTimer();
   stopRecognition();
+  invalidateReviewFlow();
   currentMode = "cards";
   resetListenGate();
   stepsScreenEl.classList.add("hidden");
@@ -1048,15 +1237,18 @@ function showCardBoxScreen() {
 
 function showReviewScreen() {
   setStepsMessage("");
+  invalidateReviewFlow();
   currentMode = "review";
   stepsScreenEl.classList.add("hidden");
   cardBoxScreenEl.classList.add("hidden");
   reviewScreenEl.classList.remove("hidden");
   learningScreenEl.classList.add("hidden");
+  speakPhrase("Let's review!");
 }
 
 function showLearningScreen() {
   setStepsMessage("");
+  invalidateReviewFlow();
   currentMode = "learning";
   stepsScreenEl.classList.add("hidden");
   cardBoxScreenEl.classList.add("hidden");
@@ -1070,16 +1262,6 @@ function findFirstIncompletePhraseIndex(stepPhrases) {
   );
 
   return incompleteIndex === -1 ? 0 : incompleteIndex;
-}
-
-function getReviewTargets(stepNumber) {
-  return [stepNumber - 1, stepNumber - 5, stepNumber - 10]
-    .filter((targetStep) => targetStep >= 1)
-    .map((targetStep) => {
-      const phrasesForStep = getStepPhrases(targetStep);
-      return phrasesForStep.length > 0 ? { stepNumber: targetStep, phrase: phrasesForStep[0] } : null;
-    })
-    .filter(Boolean);
 }
 
 function getStepRewardType(stepNumber) {
@@ -1097,6 +1279,7 @@ function getStepRewardType(stepNumber) {
 function startSelectedStep(step) {
   clearAdvanceTimer();
   currentStep = step;
+  pendingStep = null;
   isReplayingCompletedStep = isStepCompleted(step);
   currentPhraseIndex = isReplayingCompletedStep
     ? 0
@@ -1112,8 +1295,9 @@ function beginStep(step) {
   }
 
   pendingStep = step;
-  reviewQueue = getReviewTargets(step);
+  reviewQueue = buildReviewQueue();
   reviewProgress = reviewQueue.map(() => 0);
+  reviewFailures = reviewQueue.map(() => 0);
   currentReviewIndex = 0;
 
   if (reviewQueue.length === 0) {
@@ -1164,23 +1348,32 @@ function renderReviewCard() {
   if (!item) {
     reviewStepLabelEl.textContent = "Review Clear";
     reviewStatusEl.textContent = "Ready";
-    reviewEnglishEl.textContent = "All review items are done.";
+    reviewEnglishEl.textContent = "Let's start today's speaking practice!";
+    reviewEnglishEl.classList.remove("hidden");
     reviewKoreanEl.textContent = "";
+    reviewKoreanEl.classList.add("hidden");
     renderReviewSlots();
-    setReviewFeedback("Nice! You can start the new step.", "success");
+    setReviewFeedback("Nice review! Starting today's speaking practice...", "success");
     reviewRecordBtn.classList.add("hidden");
     reviewListenBtn.classList.add("hidden");
-    reviewStartBtn.classList.remove("hidden");
+    reviewStartBtn.classList.add("hidden");
     return;
   }
 
   resetListenGate();
-  reviewStepLabelEl.textContent = `Review Step ${item.stepNumber}`;
+  reviewStepLabelEl.textContent = item.mode === "recall" ? "Memory Review" : "Review";
   reviewStatusEl.textContent = `Item ${currentReviewIndex + 1} / ${reviewQueue.length}`;
-  reviewEnglishEl.textContent = item.phrase.en;
+  reviewEnglishEl.textContent = item.mode === "recall" ? "" : item.phrase.en;
+  reviewEnglishEl.classList.toggle("hidden", item.mode === "recall");
   reviewKoreanEl.textContent = item.phrase.ko;
+  reviewKoreanEl.classList.toggle("hidden", item.mode !== "recall");
   renderReviewSlots();
-  setReviewFeedback(`Listen first, then say the sentence ${REVIEW_TARGET} times.`, "");
+  setReviewFeedback(
+    item.mode === "recall"
+      ? `Listen first if you need a hint, then say it ${REVIEW_TARGET} times from memory.`
+      : `Listen first, then say the sentence ${REVIEW_TARGET} times.`,
+    ""
+  );
   reviewRecordBtn.classList.remove("hidden");
   reviewListenBtn.classList.remove("hidden");
   reviewStartBtn.classList.add("hidden");
@@ -1225,11 +1418,25 @@ function renderLearningCard() {
   }
 }
 
-function speakPhrase(text) {
+function speakPhrase(text, options = {}) {
+  const { onEnd } = options;
+
+  if (!text || typeof window.SpeechSynthesisUtterance === "undefined" || !window.speechSynthesis) {
+    if (onEnd) {
+      onEnd();
+    }
+    return;
+  }
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-US";
   utterance.rate = 0.95;
   utterance.pitch = 1;
+  utterance.onend = () => {
+    if (onEnd) {
+      onEnd();
+    }
+  };
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
@@ -1247,7 +1454,12 @@ function speakCurrentReviewPhrase() {
   const item = getCurrentReviewItem();
   if (item) {
     unlockMicAfterListen();
-    setReviewFeedback(`Great! Now tap the mic and say it ${REVIEW_TARGET} times.`, "");
+    setReviewFeedback(
+      item.mode === "recall"
+        ? `Great! Now tap the mic and say it ${REVIEW_TARGET} times from memory.`
+        : `Great! Now tap the mic and say it ${REVIEW_TARGET} times.`,
+      ""
+    );
     speakPhrase(item.phrase.en);
   }
 }
@@ -1311,11 +1523,33 @@ function moveForward() {
 
 function advanceReview() {
   currentReviewIndex += 1;
+
+  if (currentReviewIndex >= reviewQueue.length) {
+    const activeToken = reviewFlowToken;
+    renderReviewCard();
+    speakPhrase("Let's start today's speaking practice!", {
+      onEnd: () => {
+        if (activeToken !== reviewFlowToken || !pendingStep) {
+          return;
+        }
+
+        const nextStepToStart = pendingStep;
+        startSelectedStep(nextStepToStart);
+      }
+    });
+    return;
+  }
+
   renderReviewCard();
 }
 
 function handleSpeechSuccess() {
   if (currentMode === "review") {
+    const reviewItem = getCurrentReviewItem();
+    if (!reviewItem) {
+      return;
+    }
+
     reviewProgress[currentReviewIndex] = Math.min(
       REVIEW_TARGET,
       (reviewProgress[currentReviewIndex] || 0) + 1
@@ -1323,6 +1557,8 @@ function handleSpeechSuccess() {
     renderReviewSlots();
 
     if (reviewProgress[currentReviewIndex] >= REVIEW_TARGET) {
+      handleCompletedReviewItem(reviewItem, reviewFailures[currentReviewIndex] || 0);
+      saveState();
       setReviewFeedback("Nice review! Let's go on.", "success");
       clearAdvanceTimer();
       advanceTimerId = window.setTimeout(() => {
@@ -1341,6 +1577,11 @@ function handleSpeechSuccess() {
 
   const nextProgress = getPhraseProgress(phrase.id) + 1;
   setPhraseProgress(phrase.id, nextProgress);
+
+  if (nextProgress >= PHRASE_TARGET) {
+    initializePhraseReviewSchedule(phrase.id);
+  }
+
   saveState();
   renderSuccessSlots();
 
@@ -1366,6 +1607,7 @@ function handleSpeechResult(transcript) {
   if (isSpeechMatch(transcript, targetText)) {
     handleSpeechSuccess();
   } else if (currentMode === "review") {
+    reviewFailures[currentReviewIndex] = (reviewFailures[currentReviewIndex] || 0) + 1;
     setReviewFeedback(`Good try! We heard: "${transcript}"`, "error");
   } else {
     setFeedback(`Good try! We heard: "${transcript}"`, "error");
@@ -1484,6 +1726,7 @@ rewardModalEl.addEventListener("click", (event) => {
 });
 
 applyMissedDailyUnlocks();
+syncPhraseReviewsWithLearnedProgress();
 saveState();
 renderSteps();
 showStepsScreen();

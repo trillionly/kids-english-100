@@ -394,6 +394,19 @@ function syncPhraseReviewsWithLearnedProgress() {
   });
 }
 
+function isPhraseLearnedForReview(phrase, targetStepNumber) {
+  if (getPhraseProgress(phrase.id) >= PHRASE_TARGET) {
+    return true;
+  }
+
+  if (!state.testMode) {
+    return false;
+  }
+
+  const phraseStepNumber = getPhraseStepNumber(phrase.id);
+  return Number.isInteger(phraseStepNumber) && phraseStepNumber < targetStepNumber;
+}
+
 function getPhraseStepNumber(phraseId) {
   const phraseIndex = phrases.findIndex((phrase) => phrase.id === phraseId);
   if (phraseIndex === -1) {
@@ -408,11 +421,11 @@ function isPhraseDueForReview(phraseId, todayKst = getKstDateString()) {
   return getDaysBetweenDateStrings(record.nextReviewDate, todayKst) >= 0;
 }
 
-function getEligibleReviewEntries() {
+function getEligibleReviewEntries(targetStepNumber) {
   const todayKst = getKstDateString();
 
   return phrases
-    .filter((phrase) => getPhraseProgress(phrase.id) >= PHRASE_TARGET)
+    .filter((phrase) => isPhraseLearnedForReview(phrase, targetStepNumber))
     .map((phrase) => {
       const review = ensurePhraseReviewRecord(phrase.id, { dueToday: true });
       const overdueDays = Math.max(0, getDaysBetweenDateStrings(review.nextReviewDate, todayKst));
@@ -444,14 +457,21 @@ function getRecallCandidate(entries) {
       return right.review.stage - left.review.stage;
     }
 
-    return getPhraseProgress(right.phrase.id) - getPhraseProgress(left.phrase.id);
+    const leftScore = state.testMode && getPhraseProgress(left.phrase.id) === 0
+      ? PHRASE_TARGET
+      : getPhraseProgress(left.phrase.id);
+    const rightScore = state.testMode && getPhraseProgress(right.phrase.id) === 0
+      ? PHRASE_TARGET
+      : getPhraseProgress(right.phrase.id);
+
+    return rightScore - leftScore;
   });
 
   return rankedEntries.find((entry) => entry.review.stage >= 1) || rankedEntries[0] || null;
 }
 
-function buildReviewQueue() {
-  const selectedEntries = getEligibleReviewEntries().slice(0, REVIEW_SESSION_LIMIT);
+function buildReviewQueue(targetStepNumber) {
+  const selectedEntries = getEligibleReviewEntries(targetStepNumber).slice(0, REVIEW_SESSION_LIMIT);
 
   if (selectedEntries.length === 0) {
     return [];
@@ -1295,7 +1315,7 @@ function beginStep(step) {
   }
 
   pendingStep = step;
-  reviewQueue = buildReviewQueue();
+  reviewQueue = buildReviewQueue(step);
   reviewProgress = reviewQueue.map(() => 0);
   reviewFailures = reviewQueue.map(() => 0);
   currentReviewIndex = 0;

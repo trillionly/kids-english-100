@@ -1686,7 +1686,7 @@ function toggleTestMode() {
   if (state.testMode) {
     setStepsMessage("Test mode is active.");
   } else {
-    setStepsMessage("Test mode is off.");
+    setStepsMessage("");
   }
 }
 

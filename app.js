@@ -1341,6 +1341,7 @@ function renderSteps() {
     const button = document.createElement("button");
     const hasEnoughPhrases = getStepPhrases(step).length === PHRASES_PER_STEP;
     const unlocked = isStepUnlocked(step) && hasEnoughPhrases;
+    const isLockedBySchedule = !unlocked && hasEnoughPhrases;
     const completed = isStepCompleted(step);
     const rewardType = getStepRewardType(step);
 
@@ -1349,6 +1350,7 @@ function renderSteps() {
     button.disabled = !unlocked;
     button.innerHTML = `
       <span class="step-btn-label">Step ${step}</span>
+      ${isLockedBySchedule ? '<span class="step-lock-icon" aria-hidden="true">🔒</span>' : ""}
       ${completed ? '<span class="step-badge" aria-hidden="true"></span>' : ""}
     `;
 

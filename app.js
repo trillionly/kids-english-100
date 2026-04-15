@@ -772,6 +772,32 @@ function giveStepRewards(stepNumber) {
   return addCard(getRewardCard("normal", stepNumber));
 }
 
+function reconcileCompletedStepRewards() {
+  const restoredCards = [];
+
+  [...new Set(state.completedSteps)]
+    .filter((stepNumber) => Number.isInteger(stepNumber) && stepNumber >= 1 && stepNumber <= TOTAL_STEPS)
+    .sort((a, b) => a - b)
+    .forEach((stepNumber) => {
+      let expectedCard = null;
+
+      if (stepNumber % 10 === 0) {
+        expectedCard = getRewardCard("super", stepNumber);
+      } else if (stepNumber % 3 === 0) {
+        expectedCard = getRewardCard("special", stepNumber);
+      } else {
+        expectedCard = getRewardCard("normal", stepNumber);
+      }
+
+      const restoredCard = addCard(expectedCard);
+      if (restoredCard) {
+        restoredCards.push(restoredCard);
+      }
+    });
+
+  return restoredCards;
+}
+
 function awardCardForCompletedStep(stepNumber) {
   if (state.completedSteps.includes(stepNumber)) {
     return null;
@@ -1767,6 +1793,7 @@ rewardModalEl.addEventListener("click", (event) => {
 
 applyMissedDailyUnlocks();
 syncPhraseReviewsWithLearnedProgress();
+reconcileCompletedStepRewards();
 saveState();
 renderSteps();
 showStepsScreen();

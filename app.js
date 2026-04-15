@@ -735,7 +735,16 @@ function formatCardId(type, index) {
 
 function getRewardCard(type, stepNumber) {
   const total = CARD_TOTALS[type];
-  const cardIndex = ((stepNumber % total) + 1);
+  let rewardSequence = stepNumber;
+
+  if (type === "super") {
+    rewardSequence = Math.floor(stepNumber / 10);
+  } else if (type === "special") {
+    rewardSequence = Math.floor(stepNumber / 3);
+  }
+
+  const normalizedSequence = Math.max(1, rewardSequence);
+  const cardIndex = ((normalizedSequence - 1) % total) + 1;
   return {
     id: formatCardId(type, cardIndex),
     type
